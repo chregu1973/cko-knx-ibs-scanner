@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>CKO KNX IBS Scanner</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">CKO</span><div><strong>KNX IBS</strong><small>Scanner</small></div></div>
+      <nav>
+        <button class="nav-item active">⌂ <span>Übersicht</span></button>
+        <button class="nav-item">⌘ <span>Topologie</span></button>
+        <button class="nav-item">▦ <span>Gebäude</span></button>
+        <button class="nav-item">✓ <span>Prüfungen</span></button>
+        <button class="nav-item">▤ <span>Protokoll</span></button>
+      </nav>
+      <div class="credits">Technische Referenz<br /><a href="https://github.com/martinhoefling/SpectrumKNX" target="_blank" rel="noreferrer">SpectrumKNX ↗</a></div>
+      <a class="return-button" href="https://toolbox.ckoeppen.ch/">← Zurück zur Toolbox</a>
+    </aside>
+
+    <main>
+      <header>
+        <div><p class="eyebrow">LOKALE WINDOWS-ANWENDUNG</p><h1 id="project-name">KNX IBS Scanner</h1></div>
+        <div class="header-actions"><span id="project-badge" class="badge muted">○ Kein ETS-Projekt</span><span id="connection-badge" class="badge muted">○ Nicht verbunden</span></div>
+      </header>
+
+      <section class="stats">
+        <article><span class="stat-icon blue">▣</span><div><strong id="device-count">0</strong><p>Geräte</p></div></article>
+        <article><span class="stat-icon green">✓</span><div><strong>0</strong><p>OK</p></div></article>
+        <article><span class="stat-icon red">×</span><div><strong>0</strong><p>Fehler</p></div></article>
+        <article><span class="stat-icon orange">!</span><div><strong id="open-count">0</strong><p>offen</p></div></article>
+      </section>
+
+      <section class="workspace-grid">
+        <article class="panel import-panel">
+          <div class="panel-heading"><div><p class="eyebrow">SCHRITT 1</p><h2>ETS-Projekt laden</h2></div><span class="privacy">Nur lokal verarbeitet</span></div>
+          <form id="project-form">
+            <label class="dropzone" for="project-file"><span>⇧</span><strong>.knxproj auswählen</strong><small>ETS 4, ETS 5 oder ETS 6 · maximal 250 MB</small></label>
+            <input id="project-file" name="project" type="file" accept=".knxproj" required />
+            <input id="project-password" name="password" type="password" placeholder="Projektpasswort (optional)" />
+            <button class="primary" type="submit">Projekt analysieren</button>
+          </form>
+          <p id="project-message" class="message"></p>
+        </article>
+
+        <article class="panel gateway-panel">
+          <div class="panel-heading"><div><p class="eyebrow">SCHRITT 2</p><h2>KNX/IP-Schnittstelle</h2></div><button id="scan-button" class="primary">⟳ Netzwerk scannen</button></div>
+          <div id="gateway-list" class="empty-state"><span>⌁</span><strong>Noch keine Suche durchgeführt</strong><small>Die Suche verwendet KNXnet/IP Discovery im lokalen Netzwerk.</small></div>
+        </article>
+      </section>
+
+      <section class="panel topology-panel">
+        <div class="panel-heading"><div><p class="eyebrow">PROJEKTÜBERSICHT</p><h2>KNX-Topologie</h2></div><span class="legend"><i class="dot gray"></i> ungeprüft <i class="dot green"></i> OK <i class="dot orange"></i> Warnung <i class="dot red"></i> Fehler</span></div>
+        <div id="topology" class="topology-empty"><span>◇</span><strong>Projekt laden, um die Topologie darzustellen</strong></div>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
+
