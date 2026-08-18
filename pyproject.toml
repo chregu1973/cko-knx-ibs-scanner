@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cko-knx-ibs-scanner"
+version = "0.1.0"
+description = "Lokaler Windows-Assistent für KNX-Inbetriebnahme und ETS-Projektvergleich"
+requires-python = ">=3.12"
+license = { text = "GPL-3.0-only" }
+dependencies = [
+  "fastapi>=0.115,<1",
+  "python-multipart>=0.0.20,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "xknx>=3.6,<4",
+  "xknxproject>=3.8,<4",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28,<1",
+  "pyinstaller>=6.12,<7",
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.25,<1",
+  "ruff>=0.9,<1",
+]
+
+[tool.setuptools]
+py-modules = ["launcher"]
+
+[tool.setuptools.packages.find]
+include = ["cko_ibs*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
