@@ -45,3 +45,22 @@
 @media (max-width: 1050px) {
   .connection-controls { grid-template-columns: 1fr 1fr; }
 }
+
+.topology-actions,
+.monitor-actions { display: flex; align-items: center; gap: 14px; }
+.scan-progress { position: relative; height: 24px; margin: -8px 0 18px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #0c141f; }
+.scan-progress span { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, #1266ca, #37cc8a); transition: width .2s; }
+.scan-progress small { position: relative; z-index: 1; display: grid; height: 100%; place-items: center; color: #fff; }
+.device-card.checking { border-left-color: var(--blue); }
+.device-card.online { border-left-color: var(--green); background: #0d1d18; }
+.device-card.online small { color: var(--green); }
+.device-card.offline { border-left-color: var(--red); background: #211116; }
+.device-card.offline small { color: #ff7a85; }
+.monitor-panel { margin-top: 18px; }
+.monitor-table-wrap { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 9px; background: #09111a; }
+.monitor-table { width: 100%; border-collapse: collapse; font-family: Consolas, monospace; font-size: 12px; }
+.monitor-table th { position: sticky; top: 0; z-index: 1; padding: 10px; text-align: left; color: var(--muted); background: #111b28; }
+.monitor-table td { padding: 8px 10px; border-top: 1px solid #1b293a; vertical-align: top; }
+.monitor-table td:first-child { color: #8f9caf; white-space: nowrap; }
+.monitor-table td:nth-child(2),.monitor-table td:nth-child(3) { color: #7fc2ff; white-space: nowrap; }
+.monitor-empty td { padding: 35px; text-align: center; color: var(--muted) !important; }

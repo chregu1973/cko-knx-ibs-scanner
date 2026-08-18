@@ -6,13 +6,14 @@ import tempfile
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from cko_ibs import __version__
-from cko_ibs.knx_discovery import discover_gateways, network_adapters, test_tunnelling_connection
+from cko_ibs.bus_connection import bus_connection
+from cko_ibs.knx_discovery import discover_gateways, network_adapters
 from cko_ibs.project_reader import read_project
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -24,6 +25,10 @@ app = FastAPI(title="CKO KNX IBS Scanner", version=__version__)
 class ConnectionTestRequest(BaseModel):
     gateway_ip: str
     local_ip: str | None = None
+
+
+class DeviceCheckRequest(BaseModel):
+    address: str
 
 
 @app.get("/api/health")
@@ -53,7 +58,7 @@ async def adapters() -> dict:
 @app.post("/api/knx/test-connection")
 async def test_connection(request: ConnectionTestRequest) -> dict:
     try:
-        return await test_tunnelling_connection(request.gateway_ip, request.local_ip)
+        return await bus_connection.connect(request.gateway_ip, request.local_ip)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Bitte gültige IPv4-Adressen eingeben.") from exc
     except Exception as exc:
@@ -61,6 +66,44 @@ async def test_connection(request: ConnectionTestRequest) -> dict:
             status_code=502,
             detail=f"Direkte KNX/IP-Verbindung fehlgeschlagen: {exc}",
         ) from exc
+
+
+@app.get("/api/knx/status")
+async def connection_status() -> dict:
+    return bus_connection.status()
+
+
+@app.post("/api/knx/disconnect")
+async def disconnect() -> dict:
+    return await bus_connection.disconnect()
+
+
+@app.post("/api/knx/check-device")
+async def check_device(request: DeviceCheckRequest) -> dict:
+    try:
+        online = await bus_connection.check_device(request.address)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Ungültige physikalische KNX-Adresse.") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except TimeoutError:
+        online = False
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Geräteprüfung fehlgeschlagen: {exc}") from exc
+    return {"address": request.address, "online": online}
+
+
+@app.websocket("/api/knx/monitor")
+async def telegram_monitor(websocket: WebSocket) -> None:
+    await websocket.accept()
+    queue = bus_connection.subscribe()
+    try:
+        while True:
+            await websocket.send_json(await queue.get())
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
+        bus_connection.unsubscribe(queue)
 
 
 @app.post("/api/project/import")

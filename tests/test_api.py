@@ -35,3 +35,8 @@ def test_lists_network_adapters(monkeypatch) -> None:
 def test_rejects_invalid_gateway_ip() -> None:
     response = client.post("/api/knx/test-connection", json={"gateway_ip": "kein-ip"})
     assert response.status_code == 400
+
+
+def test_device_check_requires_connection() -> None:
+    response = client.post("/api/knx/check-device", json={"address": "1.1.1"})
+    assert response.status_code == 409

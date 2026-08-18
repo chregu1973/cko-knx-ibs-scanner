@@ -1,4 +1,6 @@
 const byId = (id) => document.getElementById(id);
+let projectDevices = [];
+let monitorSocket = null;
 
 async function loadAdapters() {
   const select = byId("adapter-select");
@@ -76,7 +78,9 @@ byId("test-connection-button").addEventListener("click", async () => {
     message.className = "message success";
     message.textContent = data.message;
     byId("connection-badge").className = "badge good";
-    byId("connection-badge").textContent = `✓ Verbunden mit ${data.gateway_ip}`;
+    byId("connection-badge").textContent = `✓ Bus verbunden · ${data.gateway_ip}`;
+    byId("device-scan-button").disabled = projectDevices.length === 0;
+    startMonitor();
   } catch (error) {
     message.className = "message error";
     message.textContent = error.message;
@@ -103,6 +107,7 @@ byId("project-form").addEventListener("submit", async (event) => {
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Import fehlgeschlagen");
     const project = data.project;
+    projectDevices = project.devices;
     byId("project-name").textContent = project.name;
     byId("project-badge").className = "badge good";
     byId("project-badge").textContent = "✓ ETS-Projekt geladen";
@@ -111,11 +116,83 @@ byId("project-form").addEventListener("submit", async (event) => {
     message.textContent = `${project.device_count} Geräte und ${project.group_address_count} Gruppenadressen eingelesen.`;
     const topology = byId("topology");
     topology.className = "topology-grid";
-    topology.innerHTML = project.devices.slice(0, 40).map((d) => `<div class="device-card"><strong>${escapeHtml(d.address)} · ${escapeHtml(d.name)}</strong><small>○ Noch nicht geprüft</small></div>`).join("") || "<div class='topology-empty'>Keine Geräte gefunden.</div>";
+    topology.innerHTML = project.devices.map((d) => `<div class="device-card" data-address="${escapeHtml(d.address)}"><strong>${escapeHtml(d.address)} · ${escapeHtml(d.name)}</strong><small>○ Noch nicht geprüft</small></div>`).join("") || "<div class='topology-empty'>Keine Geräte gefunden.</div>";
+    byId("device-scan-button").disabled = projectDevices.length === 0 || byId("connection-badge").classList.contains("muted");
   } catch (error) {
     message.className = "message error";
     message.textContent = error.message;
   }
+});
+
+byId("device-scan-button").addEventListener("click", async () => {
+  const button = byId("device-scan-button");
+  const progress = byId("scan-progress");
+  const bar = progress.querySelector("span");
+  const label = progress.querySelector("small");
+  let onlineCount = 0;
+  let errorCount = 0;
+  button.disabled = true;
+  progress.hidden = false;
+  bar.style.width = "0";
+  for (let index = 0; index < projectDevices.length; index += 1) {
+    const device = projectDevices[index];
+    const card = document.querySelector(`.device-card[data-address="${CSS.escape(device.address)}"]`);
+    card.className = "device-card checking";
+    card.querySelector("small").textContent = "◌ Prüfung läuft …";
+    try {
+      const response = await fetch("/api/knx/check-device", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({address: device.address}),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Prüfung fehlgeschlagen");
+      card.className = `device-card ${data.online ? "online" : "offline"}`;
+      card.querySelector("small").textContent = data.online ? "✓ Gerät antwortet" : "× Keine Antwort";
+      if (data.online) onlineCount += 1; else errorCount += 1;
+    } catch (error) {
+      card.className = "device-card offline";
+      card.querySelector("small").textContent = `× ${error.message}`;
+      errorCount += 1;
+    }
+    const completed = index + 1;
+    bar.style.width = `${(completed / projectDevices.length) * 100}%`;
+    label.textContent = `${completed} / ${projectDevices.length} Geräte geprüft`;
+    document.querySelector(".stats article:nth-child(2) strong").textContent = onlineCount;
+    document.querySelector(".stats article:nth-child(3) strong").textContent = errorCount;
+    byId("open-count").textContent = projectDevices.length - completed;
+  }
+  button.disabled = false;
+  button.textContent = "Geräte erneut prüfen";
+});
+
+function startMonitor() {
+  if (monitorSocket) monitorSocket.close();
+  const protocol = location.protocol === "https:" ? "wss" : "ws";
+  monitorSocket = new WebSocket(`${protocol}://${location.host}/api/knx/monitor`);
+  monitorSocket.onopen = () => {
+    byId("monitor-state").className = "badge good";
+    byId("monitor-state").textContent = "● Monitor aktiv";
+  };
+  monitorSocket.onmessage = (event) => addTelegram(JSON.parse(event.data));
+  monitorSocket.onclose = () => {
+    byId("monitor-state").className = "badge muted";
+    byId("monitor-state").textContent = "○ Monitor getrennt";
+  };
+}
+
+function addTelegram(telegram) {
+  const body = byId("monitor-body");
+  body.querySelector(".monitor-empty")?.remove();
+  const row = document.createElement("tr");
+  const time = new Date(telegram.time).toLocaleTimeString("de-CH", {hour12: false, fractionalSecondDigits: 3});
+  row.innerHTML = `<td>${escapeHtml(time)}</td><td>${escapeHtml(telegram.source)}</td><td>${escapeHtml(telegram.destination)}</td><td>${escapeHtml(telegram.service)}${telegram.secure ? " · Secure" : ""}</td><td>${escapeHtml(telegram.value)}</td>`;
+  body.prepend(row);
+  while (body.rows.length > 250) body.deleteRow(-1);
+}
+
+byId("clear-monitor-button").addEventListener("click", () => {
+  byId("monitor-body").innerHTML = '<tr class="monitor-empty"><td colspan="5">Anzeige geleert. Neue Telegramme erscheinen automatisch.</td></tr>';
 });
 
 function escapeHtml(value) {
