@@ -21,6 +21,7 @@ class BusConnection:
         self.gateway_ip: str | None = None
         self.local_ip: str | None = None
         self._subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
+        self._group_addresses: dict[str, dict[str, str | None]] = {}
         self._lock = asyncio.Lock()
 
     @property
@@ -47,6 +48,7 @@ class BusConnection:
                 await candidate.stop()
                 raise
             self.xknx = candidate
+            self._apply_group_address_dpts()
             self.gateway_ip = gateway
             self.local_ip = local
         return self.status("KNX/IP-Tunnel dauerhaft aufgebaut. Busmonitor ist aktiv.")
@@ -77,6 +79,21 @@ class BusConnection:
             "message": message,
         }
 
+    def configure_group_addresses(self, rows: list[dict[str, str | None]]) -> None:
+        """Keep ETS group address metadata in local memory for monitor enrichment."""
+        self._group_addresses = {str(row["address"]): row for row in rows}
+        self._apply_group_address_dpts()
+
+    def _apply_group_address_dpts(self) -> None:
+        if self.xknx is None:
+            return
+        dpts = {
+            address: row["dpt"]
+            for address, row in self._group_addresses.items()
+            if row.get("dpt")
+        }
+        self.xknx.group_address_dpt.set(dpts)
+
     def subscribe(self) -> asyncio.Queue[dict[str, Any]]:
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=250)
         self._subscribers.add(queue)
@@ -88,13 +105,20 @@ class BusConnection:
     def _on_telegram(self, telegram: Telegram) -> None:
         payload = telegram.payload
         decoded = str(telegram.decoded_data) if telegram.decoded_data is not None else None
+        destination = str(telegram.destination_address)
+        group_address = self._group_addresses.get(destination, {})
+        if telegram.decoded_data is not None and isinstance(telegram.decoded_data.value, bool):
+            decoded = "1 · Ein/True" if telegram.decoded_data.value else "0 · Aus/False"
         item = {
             "time": datetime.now().astimezone().isoformat(timespec="milliseconds"),
             "direction": telegram.direction.value,
             "source": str(telegram.source_address),
-            "destination": str(telegram.destination_address),
+            "destination": destination,
+            "group_name": group_address.get("name"),
+            "dpt": group_address.get("dpt"),
             "service": type(payload).__name__ if payload is not None else type(telegram.tpci).__name__,
-            "value": decoded or (str(payload) if payload is not None else ""),
+            "value": decoded,
+            "raw": str(payload) if payload is not None else "",
             "secure": telegram.data_secure is True,
         }
         for queue in tuple(self._subscribers):

@@ -63,4 +63,8 @@
 .monitor-table td { padding: 8px 10px; border-top: 1px solid #1b293a; vertical-align: top; }
 .monitor-table td:first-child { color: #8f9caf; white-space: nowrap; }
 .monitor-table td:nth-child(2),.monitor-table td:nth-child(3) { color: #7fc2ff; white-space: nowrap; }
+.monitor-table td:nth-child(3) { min-width: 260px; white-space: normal; }
+.monitor-table td:nth-child(4) { color: #a878ff; white-space: nowrap; }
+.monitor-value { color: #70e5ae; min-width: 130px; }
+.monitor-raw { max-width: 420px; overflow: hidden; color: #728096; text-overflow: ellipsis; white-space: nowrap; }
 .monitor-empty td { padding: 35px; text-align: center; color: var(--muted) !important; }

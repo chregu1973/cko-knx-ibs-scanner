@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from cko_ibs.main import app
+from cko_ibs.project_reader import _format_dpt
 
 client = TestClient(app)
 
@@ -40,3 +41,9 @@ def test_rejects_invalid_gateway_ip() -> None:
 def test_device_check_requires_connection() -> None:
     response = client.post("/api/knx/check-device", json={"address": "1.1.1"})
     assert response.status_code == 409
+
+
+def test_formats_ets_dpt() -> None:
+    assert _format_dpt({"main": 1, "sub": 1}) == "1.001"
+    assert _format_dpt({"main": 9, "sub": None}) == "9"
+    assert _format_dpt(None) is None

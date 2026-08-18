@@ -186,13 +186,14 @@ function addTelegram(telegram) {
   body.querySelector(".monitor-empty")?.remove();
   const row = document.createElement("tr");
   const time = new Date(telegram.time).toLocaleTimeString("de-CH", {hour12: false, fractionalSecondDigits: 3});
-  row.innerHTML = `<td>${escapeHtml(time)}</td><td>${escapeHtml(telegram.source)}</td><td>${escapeHtml(telegram.destination)}</td><td>${escapeHtml(telegram.service)}${telegram.secure ? " · Secure" : ""}</td><td>${escapeHtml(telegram.value)}</td>`;
+  const destination = telegram.group_name ? `${telegram.destination} · ${telegram.group_name}` : telegram.destination;
+  row.innerHTML = `<td>${escapeHtml(time)}</td><td>${escapeHtml(telegram.source)}</td><td>${escapeHtml(destination)}</td><td>${escapeHtml(telegram.dpt || "—")}</td><td>${escapeHtml(telegram.service)}${telegram.secure ? " · Secure" : ""}</td><td class="monitor-value">${escapeHtml(telegram.value || "—")}</td><td class="monitor-raw">${escapeHtml(telegram.raw || "—")}</td>`;
   body.prepend(row);
   while (body.rows.length > 250) body.deleteRow(-1);
 }
 
 byId("clear-monitor-button").addEventListener("click", () => {
-  byId("monitor-body").innerHTML = '<tr class="monitor-empty"><td colspan="5">Anzeige geleert. Neue Telegramme erscheinen automatisch.</td></tr>';
+  byId("monitor-body").innerHTML = '<tr class="monitor-empty"><td colspan="7">Anzeige geleert. Neue Telegramme erscheinen automatisch.</td></tr>';
 });
 
 function escapeHtml(value) {

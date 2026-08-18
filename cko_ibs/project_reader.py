@@ -14,6 +14,14 @@ def _name(value: Any, fallback: str) -> str:
     return str(getattr(value, "name", None) or fallback)
 
 
+def _format_dpt(dpt: Any) -> str | None:
+    if not isinstance(dpt, dict) or dpt.get("main") is None:
+        return None
+    main = int(dpt["main"])
+    sub = dpt.get("sub")
+    return str(main) if sub is None else f"{main}.{int(sub):03d}"
+
+
 def read_project(path: Path, password: str | None = None) -> dict[str, Any]:
     """Parse an ETS project without changing it and return a compact UI model."""
     project = XKNXProj(str(path), password=password or None).parse()
@@ -33,6 +41,16 @@ def read_project(path: Path, password: str | None = None) -> dict[str, Any]:
             }
         )
 
+    group_address_rows = []
+    for address, group_address in group_addresses.items():
+        group_address_rows.append(
+            {
+                "address": str(group_address.get("address") or address),
+                "name": _name(group_address, "Unbenannte Gruppenadresse"),
+                "dpt": _format_dpt(group_address.get("dpt")),
+            }
+        )
+
     return {
         "name": _name(info, path.stem),
         "filename": path.name,
@@ -41,5 +59,5 @@ def read_project(path: Path, password: str | None = None) -> dict[str, Any]:
         "location_count": len(locations),
         "topology_node_count": len(topology),
         "devices": sorted(device_rows, key=lambda item: tuple(int(x) for x in item["address"].split("."))),
+        "group_addresses": group_address_rows,
     }
-

@@ -129,6 +129,7 @@ async def import_project(
                 status_code=422,
                 detail="ETS-Projekt konnte nicht gelesen werden. Projektpasswort und Datei prüfen.",
             ) from exc
+    bus_connection.configure_group_addresses(summary.pop("group_addresses", []))
     return {"project": summary, "stored_on_server": False}
 
 
