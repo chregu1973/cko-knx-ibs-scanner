@@ -8,6 +8,7 @@ a = Analysis(
     binaries=[],
     datas=[(str(root / "cko_ibs" / "static"), "cko_ibs/static")],
     hiddenimports=[
+        "cko_ibs.main",
         "uvicorn.logging",
         "uvicorn.loops.auto",
         "uvicorn.protocols.http.auto",
@@ -19,4 +20,3 @@ a = Analysis(
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="CKO-KNX-IBS", console=True)
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=True, name="CKO-KNX-IBS")
-
