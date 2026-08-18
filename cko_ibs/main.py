@@ -9,15 +9,21 @@ from typing import Annotated
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from cko_ibs import __version__
-from cko_ibs.knx_discovery import discover_gateways
+from cko_ibs.knx_discovery import discover_gateways, network_adapters, test_tunnelling_connection
 from cko_ibs.project_reader import read_project
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = PACKAGE_DIR / "static"
 
 app = FastAPI(title="CKO KNX IBS Scanner", version=__version__)
+
+
+class ConnectionTestRequest(BaseModel):
+    gateway_ip: str
+    local_ip: str | None = None
 
 
 @app.get("/api/health")
@@ -33,6 +39,28 @@ async def gateways(local_ip: str | None = None, timeout: float = 3.0) -> dict:
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"KNX/IP-Suche fehlgeschlagen: {exc}") from exc
     return {"gateways": [gateway.to_dict() for gateway in result], "count": len(result)}
+
+
+@app.get("/api/network/adapters")
+async def adapters() -> dict:
+    try:
+        result = network_adapters()
+    except OSError as exc:
+        raise HTTPException(status_code=502, detail=f"Netzwerkadapter konnten nicht gelesen werden: {exc}") from exc
+    return {"adapters": result, "count": len(result)}
+
+
+@app.post("/api/knx/test-connection")
+async def test_connection(request: ConnectionTestRequest) -> dict:
+    try:
+        return await test_tunnelling_connection(request.gateway_ip, request.local_ip)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Bitte gültige IPv4-Adressen eingeben.") from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Direkte KNX/IP-Verbindung fehlgeschlagen: {exc}",
+        ) from exc
 
 
 @app.post("/api/project/import")

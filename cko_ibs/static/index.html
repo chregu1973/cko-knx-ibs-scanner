@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>CKO KNX IBS Scanner</title>
     <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/connection.css" />
   </head>
   <body>
     <aside class="sidebar">
@@ -47,6 +48,16 @@
 
         <article class="panel gateway-panel">
           <div class="panel-heading"><div><p class="eyebrow">SCHRITT 2</p><h2>KNX/IP-Schnittstelle</h2></div><button id="scan-button" class="primary">⟳ Netzwerk scannen</button></div>
+          <div class="connection-controls">
+            <label>Windows-Netzwerkadapter
+              <select id="adapter-select"><option value="">Automatisch auswählen</option></select>
+            </label>
+            <label>KNX/IP-Adresse (optional)
+              <input id="gateway-ip" type="text" inputmode="decimal" placeholder="z. B. 192.168.1.20" />
+            </label>
+            <button id="test-connection-button" class="secondary" type="button">Direkte Verbindung testen</button>
+          </div>
+          <p id="connection-message" class="message"></p>
           <div id="gateway-list" class="empty-state"><span>⌁</span><strong>Noch keine Suche durchgeführt</strong><small>Die Suche verwendet KNXnet/IP Discovery im lokalen Netzwerk.</small></div>
         </article>
       </section>
@@ -59,4 +70,3 @@
     <script src="/static/app.js"></script>
   </body>
 </html>
-

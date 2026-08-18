@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 license = { text = "GPL-3.0-only" }
 dependencies = [
   "fastapi>=0.115,<1",
+  "ifaddr>=0.2,<1",
   "python-multipart>=0.0.20,<1",
   "uvicorn[standard]>=0.34,<1",
   "xknx>=3.6,<4",
@@ -38,4 +39,3 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 110
 target-version = "py312"
-
