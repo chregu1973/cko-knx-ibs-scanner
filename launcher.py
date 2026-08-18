@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import os
+import sys
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.request
 import webbrowser
+from pathlib import Path
 
 
 def _open_browser(url: str) -> None:
@@ -21,13 +24,32 @@ def _open_browser(url: str) -> None:
 
 
 def main() -> None:
-    import uvicorn
+    try:
+        import uvicorn
 
-    host = "127.0.0.1"
-    port = int(os.getenv("CKO_IBS_PORT", "8766"))
-    url = f"http://{host}:{port}"
-    threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
-    uvicorn.run("cko_ibs.main:app", host=host, port=port, log_level="info")
+        # Import the application object directly. Besides giving clearer runtime
+        # errors, this ensures PyInstaller includes the complete local package.
+        from cko_ibs.main import app
+
+        host = "127.0.0.1"
+        port = int(os.getenv("CKO_IBS_PORT", "8766"))
+        url = f"http://{host}:{port}"
+        threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
+        uvicorn.run(app, host=host, port=port, log_level="info")
+    except Exception:  # noqa: BLE001 - top-level crash reporter must catch startup failures
+        error_text = traceback.format_exc()
+        base_dir = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
+        log_path = base_dir / "CKO-KNX-IBS-error.log"
+        try:
+            log_path.write_text(error_text, encoding="utf-8")
+        except OSError:
+            log_path = Path(os.getenv("TEMP", ".")) / "CKO-KNX-IBS-error.log"
+            log_path.write_text(error_text, encoding="utf-8")
+        print("\nCKO KNX IBS Scanner konnte nicht gestartet werden.\n")
+        print(error_text)
+        print(f"Die Fehlermeldung wurde gespeichert unter:\n{log_path}\n")
+        input("Zum Schließen die Eingabetaste drücken ...")
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
