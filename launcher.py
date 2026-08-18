@@ -29,13 +29,16 @@ def main() -> None:
 
         # Import the application object directly. Besides giving clearer runtime
         # errors, this ensures PyInstaller includes the complete local package.
-        from cko_ibs.main import app
+        from cko_ibs.main import app, set_shutdown_handler
 
         host = "127.0.0.1"
         port = int(os.getenv("CKO_IBS_PORT", "8766"))
         url = f"http://{host}:{port}"
         threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
-        uvicorn.run(app, host=host, port=port, log_level="info")
+        config = uvicorn.Config(app, host=host, port=port, log_level="info")
+        server = uvicorn.Server(config)
+        set_shutdown_handler(lambda: setattr(server, "should_exit", True))
+        server.run()
     except Exception:  # noqa: BLE001 - top-level crash reporter must catch startup failures
         error_text = traceback.format_exc()
         base_dir = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()

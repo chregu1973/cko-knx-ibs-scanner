@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
@@ -20,6 +22,19 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = PACKAGE_DIR / "static"
 
 app = FastAPI(title="CKO KNX IBS Scanner", version=__version__)
+_shutdown_handler: Callable[[], None] | None = None
+
+
+def set_shutdown_handler(handler: Callable[[], None] | None) -> None:
+    """Register the launcher callback that stops the local Uvicorn server."""
+    global _shutdown_handler
+    _shutdown_handler = handler
+
+
+async def _shutdown_after_response() -> None:
+    await asyncio.sleep(0.4)
+    if _shutdown_handler is not None:
+        _shutdown_handler()
 
 
 class ConnectionTestRequest(BaseModel):
@@ -34,6 +49,18 @@ class DeviceCheckRequest(BaseModel):
 @app.get("/api/health")
 async def health() -> dict:
     return {"status": "ok", "version": __version__, "local_only": True}
+
+
+@app.post("/api/application/shutdown")
+async def shutdown_application() -> dict:
+    """Disconnect KNX and request a graceful stop after the response was sent."""
+    await bus_connection.disconnect()
+    asyncio.create_task(_shutdown_after_response())
+    return {
+        "status": "shutting_down",
+        "knx_disconnected": True,
+        "message": "KNX-Verbindung getrennt. Die Anwendung wird beendet.",
+    }
 
 
 @app.get("/api/knx/gateways")

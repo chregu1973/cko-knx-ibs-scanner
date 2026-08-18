@@ -68,3 +68,18 @@
 .monitor-value { color: #70e5ae; min-width: 130px; }
 .monitor-raw { max-width: 420px; overflow: hidden; color: #728096; text-overflow: ellipsis; white-space: nowrap; }
 .monitor-empty td { padding: 35px; text-align: center; color: var(--muted) !important; }
+.shutdown-button { width: 100%; margin-bottom: 10px; padding: 13px 16px; border: 1px solid #8d2632; border-radius: 9px; background: #3a151c; color: #ffb0b7; cursor: pointer; font-weight: 700; text-align: left; }
+.shutdown-button:hover { border-color: var(--red); background: #4a1821; color: #fff; }
+.shutdown-dialog { width: min(480px, calc(100vw - 30px)); padding: 0; border: 1px solid #8d2632; border-radius: 14px; background: #111a26; color: var(--text); box-shadow: 0 24px 80px #000c; }
+.shutdown-dialog::backdrop { background: #05080dcc; backdrop-filter: blur(4px); }
+.shutdown-dialog form { padding: 30px; text-align: center; }
+.shutdown-dialog h2 { margin: 14px 0 8px; font-size: 24px; }
+.shutdown-dialog p { margin: 0 0 25px; color: var(--muted); line-height: 1.5; }
+.shutdown-icon { display: grid; width: 58px; height: 58px; margin: auto; place-items: center; border-radius: 50%; background: #3a151c; color: #ff6572; font-size: 28px; }
+.dialog-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+.danger { border: 1px solid var(--red); border-radius: 8px; background: linear-gradient(180deg,#ed3948,#a91e2b); color: #fff; padding: 11px 14px; cursor: pointer; font-weight: 700; }
+.shutdown-screen { display: grid; min-height: 100vh; margin: 0; padding: 30px; place-items: center; text-align: center; }
+.shutdown-screen div { width: min(560px, 100%); padding: 55px; border: 1px solid #256d50; border-radius: 16px; background: #111a26; }
+.shutdown-screen span { display: grid; width: 72px; height: 72px; margin: auto; place-items: center; border-radius: 50%; background: #113326; color: var(--green); font-size: 38px; }
+.shutdown-screen p,.shutdown-screen small { display: block; color: var(--muted); }
+.shutdown-screen button { margin-top: 25px; padding: 12px 20px; border: 1px solid #3d5878; border-radius: 8px; background: #152235; color: #fff; cursor: pointer; }

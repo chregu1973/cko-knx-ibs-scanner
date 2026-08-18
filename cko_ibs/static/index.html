@@ -18,6 +18,7 @@
         <button class="nav-item">▤ <span>Protokoll</span></button>
       </nav>
       <div class="credits">Technische Referenz<br /><a href="https://github.com/martinhoefling/SpectrumKNX" target="_blank" rel="noreferrer">SpectrumKNX ↗</a></div>
+      <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
       <a class="return-button" href="https://toolbox.ckoeppen.ch/">← Zurück zur Toolbox</a>
     </aside>
 
@@ -73,6 +74,17 @@
         <div class="monitor-table-wrap"><table class="monitor-table"><thead><tr><th>Zeit</th><th>Von</th><th>Gruppenadresse / Bezeichnung</th><th>DPT</th><th>Dienst</th><th>Wert</th><th>Rohdaten</th></tr></thead><tbody id="monitor-body"><tr class="monitor-empty"><td colspan="7">Nach dem Verbindungsaufbau werden aktuelle KNX-Telegramme hier angezeigt.</td></tr></tbody></table></div>
       </section>
     </main>
+    <dialog id="shutdown-dialog" class="shutdown-dialog">
+      <form method="dialog">
+        <span class="shutdown-icon">⏻</span>
+        <h2>Anwendung wirklich beenden?</h2>
+        <p>Die aktive KNX/IP-Verbindung wird sauber getrennt und der lokale Windows-Server beendet.</p>
+        <div class="dialog-actions">
+          <button class="secondary" value="cancel">Abbrechen</button>
+          <button id="confirm-shutdown-button" class="danger" value="confirm">KNX trennen &amp; beenden</button>
+        </div>
+      </form>
+    </dialog>
     <script src="/static/app.js"></script>
   </body>
 </html>

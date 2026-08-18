@@ -196,6 +196,27 @@ byId("clear-monitor-button").addEventListener("click", () => {
   byId("monitor-body").innerHTML = '<tr class="monitor-empty"><td colspan="7">Anzeige geleert. Neue Telegramme erscheinen automatisch.</td></tr>';
 });
 
+byId("shutdown-button").addEventListener("click", () => byId("shutdown-dialog").showModal());
+
+byId("shutdown-dialog").addEventListener("close", async () => {
+  if (byId("shutdown-dialog").returnValue !== "confirm") return;
+  const button = byId("confirm-shutdown-button");
+  button.disabled = true;
+  button.textContent = "Verbindung wird getrennt …";
+  try {
+    const response = await fetch("/api/application/shutdown", {method: "POST"});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Anwendung konnte nicht beendet werden");
+    if (monitorSocket) monitorSocket.close();
+    document.body.innerHTML = `<main class="shutdown-screen"><div><span>✓</span><h1>Anwendung beendet</h1><p>${escapeHtml(data.message)}</p><small>Dieses Browserfenster kann jetzt geschlossen werden.</small><button onclick="window.close()">Fenster schließen</button></div></main>`;
+    setTimeout(() => window.close(), 800);
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = "KNX trennen & beenden";
+    alert(error.message);
+  }
+});
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[char]);
 }

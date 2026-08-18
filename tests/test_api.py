@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from cko_ibs.main import app
+from cko_ibs.main import app, set_shutdown_handler
 from cko_ibs.project_reader import _format_dpt
 
 client = TestClient(app)
@@ -47,3 +47,17 @@ def test_formats_ets_dpt() -> None:
     assert _format_dpt({"main": 1, "sub": 1}) == "1.001"
     assert _format_dpt({"main": 9, "sub": None}) == "9"
     assert _format_dpt(None) is None
+
+
+def test_shutdown_disconnects_and_requests_stop(monkeypatch) -> None:
+    stopped = []
+
+    async def fake_disconnect() -> dict:
+        return {"connected": False}
+
+    monkeypatch.setattr("cko_ibs.main.bus_connection.disconnect", fake_disconnect)
+    set_shutdown_handler(lambda: stopped.append(True))
+    response = client.post("/api/application/shutdown")
+    assert response.status_code == 200
+    assert response.json()["knx_disconnected"] is True
+    set_shutdown_handler(None)
