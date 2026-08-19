@@ -18,5 +18,5 @@ a = Analysis(
     ],
 )
 pyz = PYZ(a.pure)
-exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="CKO-KNX-IBS", console=True)
+exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="CKO-KNX-IBS", console=False)
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=True, name="CKO-KNX-IBS")

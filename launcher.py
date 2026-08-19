@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import threading
@@ -11,6 +12,21 @@ import urllib.error
 import urllib.request
 import webbrowser
 from pathlib import Path
+
+
+def _runtime_dir() -> Path:
+    return Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
+
+
+def _show_startup_error(message: str) -> None:
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(0, message, "CKO KNX IBS Scanner", 0x10)
+    except (AttributeError, OSError):
+        pass
 
 
 def _open_browser(url: str) -> None:
@@ -24,6 +40,17 @@ def _open_browser(url: str) -> None:
 
 
 def main() -> None:
+    log_path = _runtime_dir() / "CKO-KNX-IBS.log"
+    try:
+        logging.basicConfig(
+            filename=log_path,
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+            encoding="utf-8",
+        )
+    except OSError:
+        log_path = Path(os.getenv("TEMP", ".")) / "CKO-KNX-IBS.log"
+        logging.basicConfig(filename=log_path, level=logging.INFO, encoding="utf-8")
     try:
         import uvicorn
 
@@ -35,23 +62,21 @@ def main() -> None:
         port = int(os.getenv("CKO_IBS_PORT", "8766"))
         url = f"http://{host}:{port}"
         threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
-        config = uvicorn.Config(app, host=host, port=port, log_level="info")
+        logging.info("CKO KNX IBS Scanner startet lokal auf %s", url)
+        config = uvicorn.Config(app, host=host, port=port, log_config=None, access_log=False)
         server = uvicorn.Server(config)
         set_shutdown_handler(lambda: setattr(server, "should_exit", True))
         server.run()
     except Exception:  # noqa: BLE001 - top-level crash reporter must catch startup failures
         error_text = traceback.format_exc()
-        base_dir = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
-        log_path = base_dir / "CKO-KNX-IBS-error.log"
+        error_log_path = _runtime_dir() / "CKO-KNX-IBS-error.log"
         try:
-            log_path.write_text(error_text, encoding="utf-8")
+            error_log_path.write_text(error_text, encoding="utf-8")
         except OSError:
-            log_path = Path(os.getenv("TEMP", ".")) / "CKO-KNX-IBS-error.log"
-            log_path.write_text(error_text, encoding="utf-8")
-        print("\nCKO KNX IBS Scanner konnte nicht gestartet werden.\n")
-        print(error_text)
-        print(f"Die Fehlermeldung wurde gespeichert unter:\n{log_path}\n")
-        input("Zum Schließen die Eingabetaste drücken ...")
+            error_log_path = Path(os.getenv("TEMP", ".")) / "CKO-KNX-IBS-error.log"
+            error_log_path.write_text(error_text, encoding="utf-8")
+        logging.exception("CKO KNX IBS Scanner konnte nicht gestartet werden")
+        _show_startup_error(f"Das Programm konnte nicht gestartet werden.\n\nFehlerprotokoll:\n{error_log_path}")
         raise SystemExit(1)
 
 

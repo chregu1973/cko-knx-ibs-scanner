@@ -1,6 +1,7 @@
 const byId = (id) => document.getElementById(id);
 let projectDevices = [];
 let monitorSocket = null;
+let topologyFlowResizeBound = false;
 
 async function loadAdapters() {
   const select = byId("adapter-select");
@@ -201,7 +202,7 @@ function renderTopology(areas, fallbackDevices) {
   const topology = byId("topology");
   const source = areas?.length ? areas : [{address: "—", name: "Nicht zugeordnete Geräte", lines: [{address: "—", name: "Geräte", medium: "Unbekannt", devices: fallbackDevices}]}];
   topology.className = "topology-layout";
-  topology.innerHTML = `<div class="topology-map">${renderTopologyMap(source)}</div><div class="topology-tree">${source.map((area, areaIndex) => {
+  topology.innerHTML = `<div class="topology-map"><svg class="map-flow-layer" aria-hidden="true"></svg>${renderTopologyMap(source)}</div><div class="topology-tree">${source.map((area, areaIndex) => {
     const areaCount = area.lines.reduce((sum, line) => sum + line.devices.length, 0);
     return `<details class="topology-area" ${areaIndex === 0 ? "open" : ""}>
       <summary class="area-header">
@@ -229,16 +230,57 @@ function renderTopology(areas, fallbackDevices) {
     detail.open = true;
     detail.scrollIntoView({behavior: "smooth", block: "center"});
   }));
+  requestAnimationFrame(drawTopologyFlows);
+  if (!topologyFlowResizeBound) {
+    window.addEventListener("resize", drawTopologyFlows);
+    topologyFlowResizeBound = true;
+  }
 }
 
 function renderTopologyMap(areas) {
   return `<div class="map-root"><span>▣</span><strong>KNX-Projekt</strong><small>${areas.length} Bereiche</small></div>
-    <div class="map-trunk"></div>
     <div class="map-areas">${areas.map((area) => {
       const count = area.lines.reduce((sum, line) => sum + line.devices.length, 0);
       return `<div class="map-area"><div class="map-area-node"><span>A</span><div><small>BEREICH ${escapeHtml(area.address)}</small><strong>${escapeHtml(area.name)}</strong><em>${count} Geräte</em></div></div>
         <div class="map-lines">${area.lines.map((line) => `<button class="map-line-node" type="button" data-line-address="${escapeHtml(line.address)}"><span class="map-line-state">○</span><div><small>LINIE ${escapeHtml(line.address)}</small><strong>${escapeHtml(line.name)}</strong><em>${line.devices.length} Geräte</em></div></button>`).join("")}</div></div>`;
     }).join("")}</div>`;
+}
+
+function drawTopologyFlows() {
+  const map = document.querySelector(".topology-map");
+  const svg = map?.querySelector(".map-flow-layer");
+  const root = map?.querySelector(".map-root");
+  if (!map || !svg || !root) return;
+  const mapRect = map.getBoundingClientRect();
+  const width = map.scrollWidth;
+  const height = map.scrollHeight;
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.style.width = `${width}px`;
+  svg.style.height = `${height}px`;
+  const point = (element, edge) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      x: rect.left - mapRect.left + map.scrollLeft + rect.width / 2,
+      y: rect.top - mapRect.top + map.scrollTop + (edge === "bottom" ? rect.height : 0),
+    };
+  };
+  const paths = [];
+  const connect = (from, to, state = "normal") => {
+    const start = point(from, "bottom");
+    const end = point(to, "top");
+    const bend = start.y + Math.max(24, (end.y - start.y) * .48);
+    const d = `M ${start.x} ${start.y} C ${start.x} ${bend}, ${end.x} ${bend}, ${end.x} ${end.y}`;
+    paths.push(`<path class="flow-base ${state}" d="${d}"/><path class="flow-pulse ${state}" d="${d}"/>`);
+  };
+  map.querySelectorAll(".map-area").forEach((area) => {
+    const areaNode = area.querySelector(".map-area-node");
+    connect(root, areaNode);
+    area.querySelectorAll(".map-line-node").forEach((line) => {
+      const state = line.classList.contains("has-error") ? "error" : line.classList.contains("is-ok") ? "ok" : "open";
+      connect(areaNode, line, state);
+    });
+  });
+  svg.innerHTML = paths.join("");
 }
 
 function deviceCard(device) {
@@ -274,6 +316,7 @@ function updateTopologySummaries() {
     const open = cards.length - ok - errors - infos;
     area.querySelector('[data-scope="area"]').textContent = `${cards.length} Geräte · ${ok} OK · ${errors} Fehler · ${open} offen${infos ? ` · ${infos} Info` : ""}`;
   });
+  drawTopologyFlows();
   renderOpenPoints();
 }
 
