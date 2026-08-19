@@ -41,6 +41,7 @@ class ConnectionTestRequest(BaseModel):
     gateway_ip: str
     local_ip: str | None = None
     mode: str = "automatic"
+    individual_address: str | None = None
 
 
 class DeviceCheckRequest(BaseModel):
@@ -86,9 +87,14 @@ async def adapters() -> dict:
 @app.post("/api/knx/test-connection")
 async def test_connection(request: ConnectionTestRequest) -> dict:
     try:
-        return await bus_connection.connect(request.gateway_ip, request.local_ip, request.mode)
+        return await bus_connection.connect(
+            request.gateway_ip,
+            request.local_ip,
+            request.mode,
+            request.individual_address,
+        )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Bitte gültige IPv4-Adressen eingeben.") from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=502,
@@ -100,6 +106,7 @@ async def test_connection(request: ConnectionTestRequest) -> dict:
 async def connect_secure(
     gateway_ip: Annotated[str, Form()],
     local_ip: Annotated[str | None, Form()] = None,
+    individual_address: Annotated[str | None, Form()] = None,
     keyring_password: Annotated[str | None, Form()] = None,
     user_id: Annotated[int | None, Form()] = None,
     user_password: Annotated[str | None, Form()] = None,
@@ -126,6 +133,7 @@ async def connect_secure(
                 return await bus_connection.connect_secure(
                     gateway_ip,
                     local_ip,
+                    individual_address=individual_address,
                     keyring_path=str(keyring_path),
                     keyring_password=keyring_password,
                     user_id=user_id,
@@ -133,6 +141,7 @@ async def connect_secure(
         return await bus_connection.connect_secure(
             gateway_ip,
             local_ip,
+            individual_address=individual_address,
             user_id=user_id,
             user_password=user_password,
             device_authentication_password=authentication_code,

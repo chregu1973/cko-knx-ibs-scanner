@@ -9,6 +9,8 @@ Der erste Prototyp bietet:
 
 - lokales Windows-WebView2-Fenster im CKO-Design (kein separates Browserfenster)
 - automatische Suche nach KNXnet/IP-Schnittstellen
+- Anzeige und optionale Anforderung der physikalischen KNX-Tunneladresse
+- Diagnosetest vor dem vollständigen Gerätescan
 - Anzeige von Tunnelling-, Routing- und Secure-Eigenschaften
 - lokaler Import von ETS-4/5/6-Projekten (`.knxproj`)
 - erste grafische Projekt- und Topologieübersicht

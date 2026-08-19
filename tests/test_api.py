@@ -3,7 +3,7 @@ from xml.etree import ElementTree
 
 from fastapi.testclient import TestClient
 
-from cko_ibs.bus_connection import connection_attempts
+from cko_ibs.bus_connection import BusConnection, connection_attempts
 from cko_ibs.main import app, set_shutdown_handler
 from cko_ibs.project_reader import (
     _build_topology,
@@ -139,6 +139,21 @@ def test_automatic_connection_fallback_order() -> None:
     attempts = connection_attempts("automatic")
     assert [attempt[0] for attempt in attempts] == ["UDP", "UDP · NAT", "TCP"]
     assert connection_attempts("tcp")[0][0] == "TCP"
+
+
+def test_validates_optional_tunnel_address() -> None:
+    assert BusConnection._validate_individual_address(None) is None
+    assert BusConnection._validate_individual_address(" 2.1.246 ") == "2.1.246"
+
+
+def test_rejects_reserved_tunnel_addresses() -> None:
+    for address in ("0.0.0", "15.15.255"):
+        try:
+            BusConnection._validate_individual_address(address)
+        except ValueError as exc:
+            assert "keine geeigneten Tunneladressen" in str(exc)
+        else:
+            raise AssertionError(f"{address} muss abgelehnt werden")
 
 
 def test_secure_connection_requires_credentials() -> None:

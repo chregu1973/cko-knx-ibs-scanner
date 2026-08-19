@@ -1,6 +1,6 @@
 .connection-controls {
   display: grid;
-  grid-template-columns: 1fr 1fr .72fr auto;
+  grid-template-columns: 1fr 1fr .72fr .82fr auto;
   gap: 10px;
   align-items: end;
   margin-bottom: 8px;
@@ -41,6 +41,9 @@
 }
 
 .message.success { color: #70e5ae; }
+.tunnel-diagnostic { margin: 9px 0 12px; padding: 10px 12px; border: 1px solid #276aa3; border-radius: 8px; background: #0c2035; color: #9ed5ff; font-size: 11px; line-height: 1.45; }
+.tunnel-diagnostic.warning { border-color: #9a661d; background: #2a1e0d; color: #ffc66f; }
+.tunnel-diagnostic strong { color: #fff; }
 
 @media (max-width: 1050px) {
   .connection-controls { grid-template-columns: 1fr 1fr; }

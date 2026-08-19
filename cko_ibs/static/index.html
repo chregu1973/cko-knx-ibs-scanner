@@ -60,8 +60,12 @@
             <label>Verbindungsart
               <select id="connection-mode"><option value="automatic">Automatisch</option><option value="udp">UDP</option><option value="udp_nat">UDP · NAT-Modus</option><option value="tcp">TCP</option><option value="tcp_secure">TCP Secure</option></select>
             </label>
+            <label>KNX-Tunneladresse (optional)
+              <input id="individual-address" type="text" placeholder="z. B. 2.1.246" title="Nur eine freie, für den Tunnel vorgesehene physikalische Adresse verwenden." />
+            </label>
             <button id="test-connection-button" class="secondary" type="button">Verbinden &amp; Monitor starten</button>
           </div>
+          <div id="tunnel-diagnostic" class="tunnel-diagnostic" hidden></div>
           <div id="secure-controls" class="secure-controls" hidden>
             <div class="secure-heading"><span>♢</span><div><strong>KNX IP Secure</strong><small>Schlüssel werden nur lokal im Arbeitsspeicher verwendet.</small></div></div>
             <div class="secure-grid">

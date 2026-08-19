@@ -68,9 +68,15 @@ byId("test-connection-button").addEventListener("click", async () => {
   const button = byId("test-connection-button");
   const message = byId("connection-message");
   const gatewayIp = byId("gateway-ip").value.trim();
+  const individualAddress = byId("individual-address").value.trim();
   if (!gatewayIp) {
     message.className = "message error";
     message.textContent = "Bitte zuerst die IP-Adresse der KNX/IP-Schnittstelle eingeben.";
+    return;
+  }
+  if (individualAddress && projectDevices.some((device) => device.kind !== "dummy" && device.address === individualAddress)) {
+    message.className = "message error";
+    message.textContent = `${individualAddress} gehört laut ETS bereits zu einem Gerät. Bitte eine freie Tunneladresse verwenden.`;
     return;
   }
   button.disabled = true;
@@ -83,6 +89,7 @@ byId("test-connection-button").addEventListener("click", async () => {
       const secureForm = new FormData();
       secureForm.append("gateway_ip", gatewayIp);
       if (byId("adapter-select").value) secureForm.append("local_ip", byId("adapter-select").value);
+      if (individualAddress) secureForm.append("individual_address", individualAddress);
       const keyring = byId("keyring-file").files[0];
       if (keyring) secureForm.append("keyring", keyring);
       secureForm.append("keyring_password", byId("keyring-password").value || byId("project-password").value);
@@ -94,15 +101,21 @@ byId("test-connection-button").addEventListener("click", async () => {
       response = await fetch("/api/knx/test-connection", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({gateway_ip: gatewayIp, local_ip: byId("adapter-select").value || null, mode}),
+        body: JSON.stringify({gateway_ip: gatewayIp, local_ip: byId("adapter-select").value || null, mode, individual_address: individualAddress || null}),
       });
     }
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Verbindung fehlgeschlagen");
     message.className = "message success";
-    message.textContent = data.message;
+    message.textContent = `${data.message} Quelladresse: ${data.individual_address || "nicht ermittelt"}.`;
     byId("connection-badge").className = "badge good";
-    byId("connection-badge").textContent = `✓ ${data.connection_mode} · ${data.gateway_ip}`;
+    byId("connection-badge").textContent = `✓ ${data.connection_mode} · KNX ${data.individual_address || "?"}`;
+    const diagnostic = byId("tunnel-diagnostic");
+    diagnostic.hidden = false;
+    diagnostic.className = `tunnel-diagnostic${data.address_warning ? " warning" : ""}`;
+    diagnostic.innerHTML = data.address_warning
+      ? `<strong>⚠ Tunneladress-Warnung:</strong> ${escapeHtml(data.address_warning)}`
+      : `<strong>✓ Aktive KNX-Quelladresse: ${escapeHtml(data.individual_address || "nicht ermittelt")}</strong><br>Diese Adresse wurde vom KNX/IP-Tunnel bestätigt. Für parallele Verbindungen muss jede Tunneladresse eindeutig sein.`;
     byId("device-scan-button").disabled = projectDevices.length === 0;
     startMonitor();
   } catch (error) {
@@ -110,6 +123,7 @@ byId("test-connection-button").addEventListener("click", async () => {
     message.textContent = error.message;
     byId("connection-badge").className = "badge muted";
     byId("connection-badge").textContent = "○ Nicht verbunden";
+    byId("tunnel-diagnostic").hidden = true;
   } finally {
     button.disabled = false;
   }
@@ -161,6 +175,38 @@ byId("device-scan-button").addEventListener("click", async () => {
   progress.hidden = false;
   bar.style.width = "0";
   const checkableDevices = projectDevices.filter((device) => device.kind !== "dummy");
+  const diagnosticDevice = checkableDevices.find((device) => device.test_policy === "normal") || checkableDevices[0];
+  if (diagnosticDevice) {
+    button.textContent = `Diagnosetest ${diagnosticDevice.address} …`;
+    try {
+      const diagnosticResponse = await fetch("/api/knx/check-device", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({address: diagnosticDevice.address}),
+      });
+      const diagnosticData = await diagnosticResponse.json();
+      if (!diagnosticResponse.ok) throw new Error(diagnosticData.detail || "Diagnosetest fehlgeschlagen");
+      if (!diagnosticData.online) {
+        const proceed = window.confirm(
+          `Der Diagnosetest mit ${diagnosticDevice.address} erhielt keine Antwort.\n\n` +
+          "Mögliche Ursache: ungeeignete oder bereits belegte KNX-Tunneladresse, Linienkoppler oder VPN-Routing.\n\n" +
+          "Trotzdem alle Geräte prüfen?"
+        );
+        if (!proceed) {
+          button.disabled = false;
+          button.textContent = "Geräte prüfen";
+          progress.hidden = true;
+          return;
+        }
+      }
+    } catch (error) {
+      window.alert(`Diagnosetest abgebrochen: ${error.message}`);
+      button.disabled = false;
+      button.textContent = "Geräte prüfen";
+      progress.hidden = true;
+      return;
+    }
+  }
   document.querySelectorAll('.device-card[data-kind="dummy"]').forEach((card) => {
     card.className = "device-card info-device";
     card.querySelector("small").textContent = "ℹ Info · virtuelles ETS-Gerät";

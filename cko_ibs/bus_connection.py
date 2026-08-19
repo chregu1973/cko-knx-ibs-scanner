@@ -13,6 +13,7 @@ from xknx.exceptions import XKNXException
 from xknx.io import ConnectionConfig, ConnectionType, SecureConfig
 from xknx.management.procedures import nm_individual_address_check
 from xknx.telegram import Telegram
+from xknx.telegram.address import IndividualAddress
 
 
 def connection_attempts(mode: str) -> list[tuple[str, ConnectionType, bool]]:
@@ -37,6 +38,7 @@ class BusConnection:
         self.gateway_ip: str | None = None
         self.local_ip: str | None = None
         self.connection_mode: str | None = None
+        self.requested_individual_address: str | None = None
         self._subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
         self._group_addresses: dict[str, dict[str, str | None]] = {}
         self._lock = asyncio.Lock()
@@ -46,14 +48,22 @@ class BusConnection:
         return self.xknx is not None and self.xknx.started.is_set()
 
     async def connect(
-        self, gateway_ip: str, local_ip: str | None = None, mode: str = "automatic"
+        self,
+        gateway_ip: str,
+        local_ip: str | None = None,
+        mode: str = "automatic",
+        individual_address: str | None = None,
     ) -> dict[str, Any]:
         gateway = str(ipaddress.ip_address(gateway_ip))
         local = str(ipaddress.ip_address(local_ip)) if local_ip else None
+        requested_address = self._validate_individual_address(individual_address)
+        if requested_address and mode in {"udp", "udp_nat"}:
+            raise ValueError("Eine gewünschte KNX-Tunneladresse kann nur mit TCP angefordert werden.")
         async with self._lock:
             await self._disconnect_unlocked()
             errors: list[str] = []
-            for label, connection_type, route_back in connection_attempts(mode):
+            attempts = connection_attempts("tcp") if requested_address and mode == "automatic" else connection_attempts(mode)
+            for label, connection_type, route_back in attempts:
                 config = ConnectionConfig(
                     connection_type=connection_type,
                     gateway_ip=gateway,
@@ -61,6 +71,7 @@ class BusConnection:
                     local_ip=local,
                     route_back=route_back,
                     auto_reconnect=True,
+                    individual_address=requested_address,
                 )
                 candidate = XKNX(connection_config=config, telegram_received_cb=self._on_telegram)
                 try:
@@ -76,6 +87,7 @@ class BusConnection:
                 self.gateway_ip = gateway
                 self.local_ip = local
                 self.connection_mode = label
+                self.requested_individual_address = requested_address
                 self._apply_group_address_dpts()
                 return self.status(
                     f"KNX/IP-Tunnel über {label} dauerhaft aufgebaut. Busmonitor ist aktiv."
@@ -92,6 +104,7 @@ class BusConnection:
         gateway_ip: str,
         local_ip: str | None = None,
         *,
+        individual_address: str | None = None,
         keyring_path: str | None = None,
         keyring_password: str | None = None,
         user_id: int | None = None,
@@ -101,6 +114,7 @@ class BusConnection:
         """Establish a KNX IP Secure tunnel over TCP."""
         gateway = str(ipaddress.ip_address(gateway_ip))
         local = str(ipaddress.ip_address(local_ip)) if local_ip else None
+        requested_address = self._validate_individual_address(individual_address)
         if keyring_path:
             if not keyring_password:
                 raise ValueError("Für die .knxkeys-Datei ist ein Passwort erforderlich.")
@@ -128,6 +142,7 @@ class BusConnection:
                 gateway_port=3671,
                 local_ip=local,
                 auto_reconnect=True,
+                individual_address=requested_address,
                 secure_config=secure,
             )
             candidate = XKNX(connection_config=config, telegram_received_cb=self._on_telegram)
@@ -143,6 +158,7 @@ class BusConnection:
             self.gateway_ip = gateway
             self.local_ip = local
             self.connection_mode = "TCP Secure"
+            self.requested_individual_address = requested_address
             self._apply_group_address_dpts()
         return self.status(
             "Gesicherter KNX/IP-Tunnel über TCP aufgebaut. Busmonitor ist aktiv."
@@ -155,6 +171,22 @@ class BusConnection:
         self.gateway_ip = None
         self.local_ip = None
         self.connection_mode = None
+        self.requested_individual_address = None
+
+    @staticmethod
+    def _validate_individual_address(address: str | None) -> str | None:
+        if not address or not address.strip():
+            return None
+        try:
+            parsed = IndividualAddress(address.strip())
+        except XKNXException as exc:
+            raise ValueError("Ungültige physikalische KNX-Adresse.") from exc
+        if str(parsed) in {"0.0.0", "15.15.255"}:
+            raise ValueError(
+                "0.0.0 und 15.15.255 sind keine geeigneten Tunneladressen. "
+                "Bitte eine freie, am KNX/IP-Interface konfigurierte Adresse verwenden."
+            )
+        return str(parsed)
 
     async def check_device(self, address: str) -> bool:
         if not self.connected or self.xknx is None:
@@ -163,11 +195,30 @@ class BusConnection:
             return await nm_individual_address_check(self.xknx, address)
 
     def status(self, message: str | None = None) -> dict[str, Any]:
+        current_address = str(self.xknx.current_address) if self.xknx is not None else None
+        address_warning = None
+        if current_address in {"0.0.0", "15.15.255"}:
+            address_warning = (
+                f"Die vom Tunnel verwendete Quelladresse {current_address} ist für "
+                "linienübergreifende Geräteprüfungen ungeeignet."
+            )
+        elif (
+            self.requested_individual_address
+            and current_address
+            and current_address != self.requested_individual_address
+        ):
+            address_warning = (
+                f"Angefordert war {self.requested_individual_address}, der Server hat jedoch "
+                f"{current_address} zugewiesen."
+            )
         return {
             "connected": self.connected,
             "gateway_ip": self.gateway_ip,
             "local_ip": self.local_ip,
             "connection_mode": self.connection_mode,
+            "individual_address": current_address,
+            "requested_individual_address": self.requested_individual_address,
+            "address_warning": address_warning,
             "message": message,
         }
 
