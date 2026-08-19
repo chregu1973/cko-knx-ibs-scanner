@@ -84,3 +84,11 @@ def test_automatic_connection_fallback_order() -> None:
     attempts = connection_attempts("automatic")
     assert [attempt[0] for attempt in attempts] == ["UDP", "UDP · NAT", "TCP"]
     assert connection_attempts("tcp")[0][0] == "TCP"
+
+
+def test_secure_connection_requires_credentials() -> None:
+    response = client.post(
+        "/api/knx/connect-secure",
+        data={"gateway_ip": "192.168.1.20"},
+    )
+    assert response.status_code == 400

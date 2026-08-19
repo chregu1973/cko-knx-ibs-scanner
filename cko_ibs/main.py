@@ -96,6 +96,58 @@ async def test_connection(request: ConnectionTestRequest) -> dict:
         ) from exc
 
 
+@app.post("/api/knx/connect-secure")
+async def connect_secure(
+    gateway_ip: Annotated[str, Form()],
+    local_ip: Annotated[str | None, Form()] = None,
+    keyring_password: Annotated[str | None, Form()] = None,
+    user_id: Annotated[int | None, Form()] = None,
+    user_password: Annotated[str | None, Form()] = None,
+    authentication_code: Annotated[str | None, Form()] = None,
+    keyring: Annotated[UploadFile | None, File()] = None,
+) -> dict:
+    """Connect locally using an ETS keyring or explicit Secure credentials."""
+    if keyring is None and (user_id is None or not user_password):
+        raise HTTPException(
+            status_code=400,
+            detail="Bitte .knxkeys-Datei oder Benutzer-ID und Secure-Passwort angeben.",
+        )
+    try:
+        if keyring is not None:
+            filename = Path(keyring.filename or "project.knxkeys").name
+            if not filename.lower().endswith(".knxkeys"):
+                raise HTTPException(status_code=400, detail="Bitte eine .knxkeys-Datei auswählen.")
+            payload = await keyring.read()
+            if len(payload) > 20 * 1024 * 1024:
+                raise HTTPException(status_code=413, detail="Die Keyring-Datei ist größer als 20 MB.")
+            with tempfile.TemporaryDirectory(prefix="cko-knx-secure-") as tmp_dir:
+                keyring_path = Path(tmp_dir) / filename
+                keyring_path.write_bytes(payload)
+                return await bus_connection.connect_secure(
+                    gateway_ip,
+                    local_ip,
+                    keyring_path=str(keyring_path),
+                    keyring_password=keyring_password,
+                    user_id=user_id,
+                )
+        return await bus_connection.connect_secure(
+            gateway_ip,
+            local_ip,
+            user_id=user_id,
+            user_password=user_password,
+            device_authentication_password=authentication_code,
+        )
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"KNX IP Secure-Verbindung fehlgeschlagen: {exc}",
+        ) from exc
+
+
 @app.get("/api/knx/status")
 async def connection_status() -> dict:
     return bus_connection.status()

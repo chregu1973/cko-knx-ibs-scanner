@@ -22,6 +22,14 @@ async function loadAdapters() {
 
 loadAdapters();
 
+byId("connection-mode").addEventListener("change", () => {
+  byId("secure-controls").hidden = byId("connection-mode").value !== "tcp_secure";
+});
+
+byId("keyring-file").addEventListener("change", (event) => {
+  byId("keyring-file-label").textContent = event.target.files[0]?.name || ".knxkeys auswählen";
+});
+
 byId("scan-button").addEventListener("click", async () => {
   const button = byId("scan-button");
   const list = byId("gateway-list");
@@ -68,11 +76,26 @@ byId("test-connection-button").addEventListener("click", async () => {
   message.className = "message";
   message.textContent = `Verbindung zu ${gatewayIp} wird geprüft …`;
   try {
-    const response = await fetch("/api/knx/test-connection", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({gateway_ip: gatewayIp, local_ip: byId("adapter-select").value || null, mode: byId("connection-mode").value}),
-    });
+    const mode = byId("connection-mode").value;
+    let response;
+    if (mode === "tcp_secure") {
+      const secureForm = new FormData();
+      secureForm.append("gateway_ip", gatewayIp);
+      if (byId("adapter-select").value) secureForm.append("local_ip", byId("adapter-select").value);
+      const keyring = byId("keyring-file").files[0];
+      if (keyring) secureForm.append("keyring", keyring);
+      secureForm.append("keyring_password", byId("keyring-password").value || byId("project-password").value);
+      if (byId("secure-user-id").value) secureForm.append("user_id", byId("secure-user-id").value);
+      if (byId("secure-user-password").value) secureForm.append("user_password", byId("secure-user-password").value);
+      if (byId("secure-auth-code").value) secureForm.append("authentication_code", byId("secure-auth-code").value);
+      response = await fetch("/api/knx/connect-secure", {method: "POST", body: secureForm});
+    } else {
+      response = await fetch("/api/knx/test-connection", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({gateway_ip: gatewayIp, local_ip: byId("adapter-select").value || null, mode}),
+      });
+    }
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Verbindung fehlgeschlagen");
     message.className = "message success";

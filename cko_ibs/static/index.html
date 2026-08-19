@@ -56,9 +56,26 @@
               <input id="gateway-ip" type="text" inputmode="decimal" placeholder="z. B. 192.168.1.20" />
             </label>
             <label>Verbindungsart
-              <select id="connection-mode"><option value="automatic">Automatisch</option><option value="udp">UDP</option><option value="udp_nat">UDP · NAT-Modus</option><option value="tcp">TCP</option></select>
+              <select id="connection-mode"><option value="automatic">Automatisch</option><option value="udp">UDP</option><option value="udp_nat">UDP · NAT-Modus</option><option value="tcp">TCP</option><option value="tcp_secure">TCP Secure</option></select>
             </label>
             <button id="test-connection-button" class="secondary" type="button">Verbinden &amp; Monitor starten</button>
+          </div>
+          <div id="secure-controls" class="secure-controls" hidden>
+            <div class="secure-heading"><span>♢</span><div><strong>KNX IP Secure</strong><small>Schlüssel werden nur lokal im Arbeitsspeicher verwendet.</small></div></div>
+            <div class="secure-grid">
+              <label class="secure-file">ETS Keyring
+                <span id="keyring-file-label">.knxkeys auswählen</span>
+                <input id="keyring-file" type="file" accept=".knxkeys" />
+              </label>
+              <label>Keyring-/Inbetriebnahmepasswort
+                <input id="keyring-password" type="password" autocomplete="off" placeholder="Passwort der .knxkeys" />
+              </label>
+            </div>
+            <details class="manual-secure"><summary>Secure-Daten alternativ manuell eingeben</summary><div class="secure-grid manual-grid">
+              <label>Benutzer-ID<input id="secure-user-id" type="number" min="1" max="127" placeholder="z. B. 2" /></label>
+              <label>Secure-Benutzerpasswort<input id="secure-user-password" type="password" autocomplete="off" /></label>
+              <label>Authentifizierungscode (optional)<input id="secure-auth-code" type="password" autocomplete="off" /></label>
+            </div></details>
           </div>
           <p id="connection-message" class="message"></p>
           <div id="gateway-list" class="empty-state"><span>⌁</span><strong>Noch keine Suche durchgeführt</strong><small>Die Suche verwendet KNXnet/IP Discovery im lokalen Netzwerk.</small></div>

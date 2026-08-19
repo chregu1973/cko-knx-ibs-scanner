@@ -10,7 +10,7 @@ from typing import Any
 
 from xknx import XKNX
 from xknx.exceptions import XKNXException
-from xknx.io import ConnectionConfig, ConnectionType
+from xknx.io import ConnectionConfig, ConnectionType, SecureConfig
 from xknx.management.procedures import nm_individual_address_check
 from xknx.telegram import Telegram
 
@@ -86,6 +86,67 @@ class BusConnection:
         async with self._lock:
             await self._disconnect_unlocked()
         return self.status("KNX/IP-Verbindung getrennt.")
+
+    async def connect_secure(
+        self,
+        gateway_ip: str,
+        local_ip: str | None = None,
+        *,
+        keyring_path: str | None = None,
+        keyring_password: str | None = None,
+        user_id: int | None = None,
+        user_password: str | None = None,
+        device_authentication_password: str | None = None,
+    ) -> dict[str, Any]:
+        """Establish a KNX IP Secure tunnel over TCP."""
+        gateway = str(ipaddress.ip_address(gateway_ip))
+        local = str(ipaddress.ip_address(local_ip)) if local_ip else None
+        if keyring_path:
+            if not keyring_password:
+                raise ValueError("Für die .knxkeys-Datei ist ein Passwort erforderlich.")
+            secure = SecureConfig(
+                knxkeys_file_path=keyring_path,
+                knxkeys_password=keyring_password,
+                user_id=user_id,
+            )
+        elif user_id is not None and user_password:
+            secure = SecureConfig(
+                user_id=user_id,
+                user_password=user_password,
+                device_authentication_password=device_authentication_password or None,
+            )
+        else:
+            raise ValueError(
+                "Bitte eine .knxkeys-Datei oder Benutzer-ID und Secure-Passwort angeben."
+            )
+
+        async with self._lock:
+            await self._disconnect_unlocked()
+            config = ConnectionConfig(
+                connection_type=ConnectionType.TUNNELING_TCP_SECURE,
+                gateway_ip=gateway,
+                gateway_port=3671,
+                local_ip=local,
+                auto_reconnect=True,
+                secure_config=secure,
+            )
+            candidate = XKNX(connection_config=config, telegram_received_cb=self._on_telegram)
+            try:
+                async with asyncio.timeout(12):
+                    await candidate.start()
+            except (OSError, TimeoutError, XKNXException):
+                with suppress(OSError, TimeoutError, XKNXException):
+                    async with asyncio.timeout(2):
+                        await candidate.stop()
+                raise
+            self.xknx = candidate
+            self.gateway_ip = gateway
+            self.local_ip = local
+            self.connection_mode = "TCP Secure"
+            self._apply_group_address_dpts()
+        return self.status(
+            "Gesicherter KNX/IP-Tunnel über TCP aufgebaut. Busmonitor ist aktiv."
+        )
 
     async def _disconnect_unlocked(self) -> None:
         if self.xknx is not None:
