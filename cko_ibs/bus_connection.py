@@ -4,13 +4,29 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+from contextlib import suppress
 from datetime import datetime
 from typing import Any
 
 from xknx import XKNX
+from xknx.exceptions import XKNXException
 from xknx.io import ConnectionConfig, ConnectionType
 from xknx.management.procedures import nm_individual_address_check
 from xknx.telegram import Telegram
+
+
+def connection_attempts(mode: str) -> list[tuple[str, ConnectionType, bool]]:
+    """Return connection attempts in the requested order."""
+    options = {
+        "udp": ("UDP", ConnectionType.TUNNELING, False),
+        "udp_nat": ("UDP · NAT", ConnectionType.TUNNELING, True),
+        "tcp": ("TCP", ConnectionType.TUNNELING_TCP, False),
+    }
+    if mode == "automatic":
+        return [options["udp"], options["udp_nat"], options["tcp"]]
+    if mode not in options:
+        raise ValueError("Unbekannte KNX/IP-Verbindungsart.")
+    return [options[mode]]
 
 
 class BusConnection:
@@ -20,6 +36,7 @@ class BusConnection:
         self.xknx: XKNX | None = None
         self.gateway_ip: str | None = None
         self.local_ip: str | None = None
+        self.connection_mode: str | None = None
         self._subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
         self._group_addresses: dict[str, dict[str, str | None]] = {}
         self._lock = asyncio.Lock()
@@ -28,30 +45,42 @@ class BusConnection:
     def connected(self) -> bool:
         return self.xknx is not None and self.xknx.started.is_set()
 
-    async def connect(self, gateway_ip: str, local_ip: str | None = None) -> dict[str, Any]:
+    async def connect(
+        self, gateway_ip: str, local_ip: str | None = None, mode: str = "automatic"
+    ) -> dict[str, Any]:
         gateway = str(ipaddress.ip_address(gateway_ip))
         local = str(ipaddress.ip_address(local_ip)) if local_ip else None
         async with self._lock:
             await self._disconnect_unlocked()
-            config = ConnectionConfig(
-                connection_type=ConnectionType.TUNNELING,
-                gateway_ip=gateway,
-                gateway_port=3671,
-                local_ip=local,
-                auto_reconnect=True,
-            )
-            candidate = XKNX(connection_config=config, telegram_received_cb=self._on_telegram)
-            try:
-                async with asyncio.timeout(10):
-                    await candidate.start()
-            except Exception:
-                await candidate.stop()
-                raise
-            self.xknx = candidate
-            self._apply_group_address_dpts()
-            self.gateway_ip = gateway
-            self.local_ip = local
-        return self.status("KNX/IP-Tunnel dauerhaft aufgebaut. Busmonitor ist aktiv.")
+            errors: list[str] = []
+            for label, connection_type, route_back in connection_attempts(mode):
+                config = ConnectionConfig(
+                    connection_type=connection_type,
+                    gateway_ip=gateway,
+                    gateway_port=3671,
+                    local_ip=local,
+                    route_back=route_back,
+                    auto_reconnect=True,
+                )
+                candidate = XKNX(connection_config=config, telegram_received_cb=self._on_telegram)
+                try:
+                    async with asyncio.timeout(7):
+                        await candidate.start()
+                except (OSError, TimeoutError, XKNXException) as exc:
+                    errors.append(f"{label}: {exc}")
+                    with suppress(OSError, TimeoutError, XKNXException):
+                        async with asyncio.timeout(2):
+                            await candidate.stop()
+                    continue
+                self.xknx = candidate
+                self.gateway_ip = gateway
+                self.local_ip = local
+                self.connection_mode = label
+                self._apply_group_address_dpts()
+                return self.status(
+                    f"KNX/IP-Tunnel über {label} dauerhaft aufgebaut. Busmonitor ist aktiv."
+                )
+            raise RuntimeError("Kein Verbindungsmodus erfolgreich. " + " | ".join(errors))
 
     async def disconnect(self) -> dict[str, Any]:
         async with self._lock:
@@ -64,6 +93,7 @@ class BusConnection:
         self.xknx = None
         self.gateway_ip = None
         self.local_ip = None
+        self.connection_mode = None
 
     async def check_device(self, address: str) -> bool:
         if not self.connected or self.xknx is None:
@@ -76,6 +106,7 @@ class BusConnection:
             "connected": self.connected,
             "gateway_ip": self.gateway_ip,
             "local_ip": self.local_ip,
+            "connection_mode": self.connection_mode,
             "message": message,
         }
 

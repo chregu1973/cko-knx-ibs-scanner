@@ -71,14 +71,14 @@ byId("test-connection-button").addEventListener("click", async () => {
     const response = await fetch("/api/knx/test-connection", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({gateway_ip: gatewayIp, local_ip: byId("adapter-select").value || null}),
+      body: JSON.stringify({gateway_ip: gatewayIp, local_ip: byId("adapter-select").value || null, mode: byId("connection-mode").value}),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Verbindung fehlgeschlagen");
     message.className = "message success";
     message.textContent = data.message;
     byId("connection-badge").className = "badge good";
-    byId("connection-badge").textContent = `✓ Bus verbunden · ${data.gateway_ip}`;
+    byId("connection-badge").textContent = `✓ ${data.connection_mode} · ${data.gateway_ip}`;
     byId("device-scan-button").disabled = projectDevices.length === 0;
     startMonitor();
   } catch (error) {

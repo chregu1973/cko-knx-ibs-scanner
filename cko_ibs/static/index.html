@@ -12,7 +12,6 @@
       <div class="brand"><span class="brand-mark">CKO</span><div><strong>KNX IBS</strong><small>Scanner</small></div></div>
       <nav>
         <button class="nav-item active">⌂ <span>Übersicht</span></button>
-        <button class="nav-item">⌘ <span>Topologie</span></button>
         <button class="nav-item">▦ <span>Gebäude</span></button>
         <button class="nav-item">✓ <span>Prüfungen</span></button>
         <button class="nav-item">▤ <span>Protokoll</span></button>
@@ -55,6 +54,9 @@
             </label>
             <label>KNX/IP-Adresse (optional)
               <input id="gateway-ip" type="text" inputmode="decimal" placeholder="z. B. 192.168.1.20" />
+            </label>
+            <label>Verbindungsart
+              <select id="connection-mode"><option value="automatic">Automatisch</option><option value="udp">UDP</option><option value="udp_nat">UDP · NAT-Modus</option><option value="tcp">TCP</option></select>
             </label>
             <button id="test-connection-button" class="secondary" type="button">Verbinden &amp; Monitor starten</button>
           </div>

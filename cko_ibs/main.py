@@ -40,6 +40,7 @@ async def _shutdown_after_response() -> None:
 class ConnectionTestRequest(BaseModel):
     gateway_ip: str
     local_ip: str | None = None
+    mode: str = "automatic"
 
 
 class DeviceCheckRequest(BaseModel):
@@ -85,7 +86,7 @@ async def adapters() -> dict:
 @app.post("/api/knx/test-connection")
 async def test_connection(request: ConnectionTestRequest) -> dict:
     try:
-        return await bus_connection.connect(request.gateway_ip, request.local_ip)
+        return await bus_connection.connect(request.gateway_ip, request.local_ip, request.mode)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Bitte gültige IPv4-Adressen eingeben.") from exc
     except Exception as exc:
