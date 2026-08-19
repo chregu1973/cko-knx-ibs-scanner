@@ -45,7 +45,5 @@ jobs:
         run: ./scripts/sign-windows.ps1 -FilePath "dist-installer/CKO-KNX-IBS-Scanner-Setup.exe"
       - uses: actions/upload-artifact@v4
         with:
-          name: cko-knx-ibs-windows-x64
-          path: |
-            dist/CKO-KNX-IBS/
-            dist-installer/CKO-KNX-IBS-Scanner-Setup.exe
+          name: cko-knx-ibs-windows-installer
+          path: dist-installer/CKO-KNX-IBS-Scanner-Setup.exe

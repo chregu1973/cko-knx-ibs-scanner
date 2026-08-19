@@ -1,9 +1,68 @@
 .brand-mark {
-  width: 52px;
-  height: 52px;
+  width: 190px;
+  height: auto;
   border: 0;
   border-radius: 0;
   object-fit: contain;
   transform: none;
-  filter: drop-shadow(0 0 12px #ed394855);
+  filter: drop-shadow(0 0 14px #178cff33);
+}
+
+.brand {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 0;
+}
+
+.brand > div {
+  padding-left: 10px;
+}
+
+.sidebar {
+  background:
+    radial-gradient(circle at 22% 10%, #103767 0, transparent 28%),
+    linear-gradient(180deg, #070d16 0%, #091321 58%, #07101d 100%);
+  border-right-color: #163b68;
+  box-shadow: 12px 0 40px #02071399;
+}
+
+.brand strong {
+  color: #f4f8ff;
+}
+
+.brand small,
+.credits {
+  color: #7899bd;
+}
+
+.credits a {
+  color: #55bfff;
+}
+
+.nav-item {
+  color: #cdd9e8;
+}
+
+.nav-item:hover {
+  border-color: #245887;
+  background: #0d2137;
+  color: #ffffff;
+}
+
+.nav-item.active {
+  border-color: #1979c8;
+  background: linear-gradient(90deg, #0b3b70 0%, #10263e 72%, #101b2a 100%);
+  box-shadow: inset 3px 0 #36baff, 0 0 24px #087ee633;
+}
+
+.return-button {
+  border-color: #1777c3;
+  background: linear-gradient(135deg, #0b3159, #0d1b2d);
+  box-shadow: 0 0 18px #087ee622;
+}
+
+.return-button:hover {
+  border-color: #45c3ff;
+  background: linear-gradient(135deg, #10477d, #112a45);
 }

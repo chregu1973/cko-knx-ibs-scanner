@@ -12,7 +12,6 @@ Der erste Prototyp bietet:
 - Anzeige von Tunnelling-, Routing- und Secure-Eigenschaften
 - lokaler Import von ETS-4/5/6-Projekten (`.knxproj`)
 - erste grafische Projekt- und Topologieübersicht
-- Windows-x64-Paketierung als portable ZIP-Datei
 - Windows-Installer mit CKO-Programmsymbol, Startmenü und Deinstallation
 
 ## Windows-Signatur
