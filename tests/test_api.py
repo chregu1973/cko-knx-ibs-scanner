@@ -1,8 +1,17 @@
+from io import StringIO
+from xml.etree import ElementTree
+
 from fastapi.testclient import TestClient
 
 from cko_ibs.bus_connection import connection_attempts
 from cko_ibs.main import app, set_shutdown_handler
-from cko_ibs.project_reader import _build_topology, _device_kind, _format_dpt
+from cko_ibs.project_reader import (
+    _build_topology,
+    _classify_rf_segments,
+    _device_kind,
+    _format_dpt,
+    _parse_segments,
+)
 
 client = TestClient(app)
 
@@ -84,6 +93,37 @@ def test_classifies_ets_dummy_as_non_physical_info() -> None:
     assert _device_kind("AndorX Server - Dummy-Gerät") == "dummy"
     assert _device_kind("Dummy") == "dummy"
     assert _device_kind("Schaltaktor") == "physical"
+
+
+def test_uses_full_physical_line_address_for_device_assignment() -> None:
+    topology = {
+        "0": {"name": "Backbone", "lines": {"0": {"name": "Backbone", "devices": []}}},
+        "1": {"name": "Bereich 1", "lines": {"0": {"name": "Hauptlinie", "devices": []}}},
+    }
+    devices = {"1.0.249": {"name": "Dummy"}, "1.0.250": {"name": "IP-Schnittstelle"}}
+    result = _build_topology(topology, devices)
+    assert result[0]["lines"][0]["full_address"] == "0.0"
+    assert result[0]["lines"][0]["devices"] == []
+    assert [device["address"] for device in result[1]["lines"][0]["devices"]] == [
+        "1.0.249",
+        "1.0.250",
+    ]
+
+
+def test_reads_ets6_rf_segments_and_classifies_rf_plus() -> None:
+    xml = """<KNX><Project><Installations><Installation><Topology>
+      <Area Address="1"><Line Address="1">
+        <Segment Id="S1" Name="RF Segment Büro" MediumTypeRefId="MT-2">
+          <DeviceInstance Address="67" />
+        </Segment>
+      </Line></Area>
+    </Topology></Installation></Installations></Project></KNX>"""
+    segments = _parse_segments(ElementTree.parse(StringIO(xml)))
+    assert segments["1.1"][0]["medium"] == "KNX RF (RF)"
+    assert segments["1.1"][0]["devices"] == ["1.1.67"]
+    policies = _classify_rf_segments(segments, {"1.1.67": {"name": "KNX RF-MSG-ST"}})
+    assert segments["1.1"][0]["technology"] == "rf_plus"
+    assert policies["1.1.67"] == "rf_plus"
 
 
 def test_automatic_connection_fallback_order() -> None:
