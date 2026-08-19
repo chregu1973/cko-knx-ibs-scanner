@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from cko_ibs.main import app, set_shutdown_handler
-from cko_ibs.project_reader import _format_dpt
+from cko_ibs.project_reader import _build_topology, _format_dpt
 
 client = TestClient(app)
 
@@ -61,3 +61,19 @@ def test_shutdown_disconnects_and_requests_stop(monkeypatch) -> None:
     assert response.status_code == 200
     assert response.json()["knx_disconnected"] is True
     set_shutdown_handler(None)
+
+
+def test_builds_area_line_device_topology() -> None:
+    topology = {
+        "1": {
+            "name": "Hauptbereich",
+            "lines": {
+                "1.1": {"name": "Erdgeschoss", "medium_type": "TP", "devices": ["1.1.10"]}
+            },
+        }
+    }
+    devices = {"1.1.10": {"name": "Schaltaktor"}}
+    result = _build_topology(topology, devices)
+    assert result[0]["address"] == "1"
+    assert result[0]["lines"][0]["address"] == "1.1"
+    assert result[0]["lines"][0]["devices"][0]["name"] == "Schaltaktor"

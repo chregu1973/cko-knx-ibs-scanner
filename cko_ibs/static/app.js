@@ -115,8 +115,7 @@ byId("project-form").addEventListener("submit", async (event) => {
     byId("open-count").textContent = project.device_count;
     message.textContent = `${project.device_count} Geräte und ${project.group_address_count} Gruppenadressen eingelesen.`;
     const topology = byId("topology");
-    topology.className = "topology-grid";
-    topology.innerHTML = project.devices.map((d) => `<div class="device-card" data-address="${escapeHtml(d.address)}"><strong>${escapeHtml(d.address)} · ${escapeHtml(d.name)}</strong><small>○ Noch nicht geprüft</small></div>`).join("") || "<div class='topology-empty'>Keine Geräte gefunden.</div>";
+    renderTopology(project.topology, project.devices);
     byId("device-scan-button").disabled = projectDevices.length === 0 || byId("connection-badge").classList.contains("muted");
   } catch (error) {
     message.className = "message error";
@@ -161,10 +160,64 @@ byId("device-scan-button").addEventListener("click", async () => {
     document.querySelector(".stats article:nth-child(2) strong").textContent = onlineCount;
     document.querySelector(".stats article:nth-child(3) strong").textContent = errorCount;
     byId("open-count").textContent = projectDevices.length - completed;
+    updateTopologySummaries();
   }
   button.disabled = false;
   button.textContent = "Geräte erneut prüfen";
 });
+
+function renderTopology(areas, fallbackDevices) {
+  const topology = byId("topology");
+  const source = areas?.length ? areas : [{address: "—", name: "Nicht zugeordnete Geräte", lines: [{address: "—", name: "Geräte", medium: "Unbekannt", devices: fallbackDevices}]}];
+  topology.className = "topology-tree";
+  topology.innerHTML = source.map((area, areaIndex) => {
+    const areaCount = area.lines.reduce((sum, line) => sum + line.devices.length, 0);
+    return `<details class="topology-area" ${areaIndex === 0 ? "open" : ""}>
+      <summary class="area-header">
+        <span class="node-icon area-icon">A</span>
+        <span class="node-copy"><small>BEREICH ${escapeHtml(area.address)}</small><strong>${escapeHtml(area.name)}</strong></span>
+        <span class="node-summary" data-scope="area">${areaCount} Geräte · ${area.lines.length} Linien</span>
+        <span class="chevron">⌄</span>
+      </summary>
+      <div class="area-content">${area.lines.map((line, lineIndex) => `<details class="topology-line" ${areaIndex === 0 && lineIndex === 0 ? "open" : ""}>
+        <summary class="line-header">
+          <span class="node-icon line-icon">L</span>
+          <span class="node-copy"><small>LINIE ${escapeHtml(line.address)} · ${escapeHtml(line.medium)}</small><strong>${escapeHtml(line.name)}</strong></span>
+          <span class="node-summary" data-scope="line">${line.devices.length} Geräte · 0 OK · 0 Fehler</span>
+          <span class="line-status unchecked">ungeprüft</span>
+          <span class="chevron">⌄</span>
+        </summary>
+        <div class="line-devices">${line.devices.map(deviceCard).join("") || '<p class="empty-line">Keine Geräte in dieser Linie</p>'}</div>
+      </details>`).join("") || '<p class="empty-line">Keine Linien in diesem Bereich</p>'}</div>
+    </details>`;
+  }).join("");
+}
+
+function deviceCard(device) {
+  return `<div class="device-card" data-address="${escapeHtml(device.address)}">
+    <span class="device-dot"></span><div><strong>${escapeHtml(device.address)}</strong><span>${escapeHtml(device.name)}</span><small>○ Noch nicht geprüft</small></div>
+  </div>`;
+}
+
+function updateTopologySummaries() {
+  document.querySelectorAll(".topology-line").forEach((line) => {
+    const cards = [...line.querySelectorAll(".device-card")];
+    const ok = cards.filter((card) => card.classList.contains("online")).length;
+    const errors = cards.filter((card) => card.classList.contains("offline")).length;
+    const open = cards.length - ok - errors;
+    line.querySelector('[data-scope="line"]').textContent = `${cards.length} Geräte · ${ok} OK · ${errors} Fehler · ${open} offen`;
+    const status = line.querySelector(".line-status");
+    status.className = `line-status ${errors ? "error" : open ? "unchecked" : "ok"}`;
+    status.textContent = errors ? "Fehler" : open ? "offen" : "OK";
+  });
+  document.querySelectorAll(".topology-area").forEach((area) => {
+    const cards = [...area.querySelectorAll(".device-card")];
+    const ok = cards.filter((card) => card.classList.contains("online")).length;
+    const errors = cards.filter((card) => card.classList.contains("offline")).length;
+    const open = cards.length - ok - errors;
+    area.querySelector('[data-scope="area"]').textContent = `${cards.length} Geräte · ${ok} OK · ${errors} Fehler · ${open} offen`;
+  });
+}
 
 function startMonitor() {
   if (monitorSocket) monitorSocket.close();
