@@ -13,6 +13,8 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
+LOGGER = logging.getLogger(__name__)
+
 
 def _runtime_dir() -> Path:
     return Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
@@ -62,12 +64,12 @@ def main() -> None:
         port = int(os.getenv("CKO_IBS_PORT", "8766"))
         url = f"http://{host}:{port}"
         threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
-        logging.info("CKO KNX IBS Scanner startet lokal auf %s", url)
+        LOGGER.info("CKO KNX IBS Scanner startet lokal auf %s", url)
         config = uvicorn.Config(app, host=host, port=port, log_config=None, access_log=False)
         server = uvicorn.Server(config)
         set_shutdown_handler(lambda: setattr(server, "should_exit", True))
         server.run()
-    except Exception:  # noqa: BLE001 - top-level crash reporter must catch startup failures
+    except Exception:
         error_text = traceback.format_exc()
         error_log_path = _runtime_dir() / "CKO-KNX-IBS-error.log"
         try:
@@ -75,7 +77,7 @@ def main() -> None:
         except OSError:
             error_log_path = Path(os.getenv("TEMP", ".")) / "CKO-KNX-IBS-error.log"
             error_log_path.write_text(error_text, encoding="utf-8")
-        logging.exception("CKO KNX IBS Scanner konnte nicht gestartet werden")
+        LOGGER.exception("CKO KNX IBS Scanner konnte nicht gestartet werden")
         _show_startup_error(f"Das Programm konnte nicht gestartet werden.\n\nFehlerprotokoll:\n{error_log_path}")
         raise SystemExit(1)
 
