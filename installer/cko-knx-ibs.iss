@@ -1,5 +1,5 @@
 #define AppName "CKO KNX IBS Scanner"
-#define AppVersion "0.2.1"
+#define AppVersion "0.2.2"
 #define AppPublisher "CKO Toolbox"
 #define AppExeName "CKO-KNX-IBS.exe"
 
@@ -14,7 +14,7 @@ DisableProgramGroupPage=yes
 OutputDir=..\dist-installer
 OutputBaseFilename=CKO-KNX-IBS-Scanner-Setup
 SetupIconFile=..\assets\cko-toolbox.ico
-UninstallDisplayIcon={app}\{#AppExeName}
+UninstallDisplayIcon={app}\CKO-KNX-IBS.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -36,10 +36,11 @@ Name: "desktopicon"; Description: "Desktop-Verknüpfung erstellen"; GroupDescrip
 
 [Files]
 Source: "..\dist\CKO-KNX-IBS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\assets\cko-toolbox.ico"; DestDir: "{app}"; DestName: "CKO-KNX-IBS.ico"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\{#AppExeName}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\CKO-KNX-IBS.ico"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\CKO-KNX-IBS.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "{#AppName} starten"; Flags: nowait postinstall skipifsilent
