@@ -135,10 +135,13 @@ byId("project-form").addEventListener("submit", async (event) => {
     byId("project-badge").className = "badge good";
     byId("project-badge").textContent = "✓ ETS-Projekt geladen";
     byId("device-count").textContent = project.device_count;
-    byId("open-count").textContent = project.device_count;
+    document.querySelector(".stats article:nth-child(2) strong").textContent = "0";
+    document.querySelector(".stats article:nth-child(3) strong").textContent = "0";
+    byId("open-count").textContent = project.devices.filter((device) => device.kind !== "dummy").length;
     message.textContent = `${project.device_count} Geräte und ${project.group_address_count} Gruppenadressen eingelesen.`;
     const topology = byId("topology");
     renderTopology(project.topology, project.devices);
+    updateTopologySummaries();
     byId("device-scan-button").disabled = projectDevices.length === 0 || byId("connection-badge").classList.contains("muted");
   } catch (error) {
     message.className = "message error";
@@ -156,8 +159,13 @@ byId("device-scan-button").addEventListener("click", async () => {
   button.disabled = true;
   progress.hidden = false;
   bar.style.width = "0";
-  for (let index = 0; index < projectDevices.length; index += 1) {
-    const device = projectDevices[index];
+  const checkableDevices = projectDevices.filter((device) => device.kind !== "dummy");
+  document.querySelectorAll('.device-card[data-kind="dummy"]').forEach((card) => {
+    card.className = "device-card info-device";
+    card.querySelector("small").textContent = "ℹ Info · virtuelles ETS-Gerät";
+  });
+  for (let index = 0; index < checkableDevices.length; index += 1) {
+    const device = checkableDevices[index];
     const card = document.querySelector(`.device-card[data-address="${CSS.escape(device.address)}"]`);
     card.className = "device-card checking";
     card.querySelector("small").textContent = "◌ Prüfung läuft …";
@@ -178,11 +186,11 @@ byId("device-scan-button").addEventListener("click", async () => {
       errorCount += 1;
     }
     const completed = index + 1;
-    bar.style.width = `${(completed / projectDevices.length) * 100}%`;
-    label.textContent = `${completed} / ${projectDevices.length} Geräte geprüft`;
+    bar.style.width = `${(completed / checkableDevices.length) * 100}%`;
+    label.textContent = `${completed} / ${checkableDevices.length} physische Geräte geprüft`;
     document.querySelector(".stats article:nth-child(2) strong").textContent = onlineCount;
     document.querySelector(".stats article:nth-child(3) strong").textContent = errorCount;
-    byId("open-count").textContent = projectDevices.length - completed;
+    byId("open-count").textContent = checkableDevices.length - completed;
     updateTopologySummaries();
   }
   button.disabled = false;
@@ -192,8 +200,8 @@ byId("device-scan-button").addEventListener("click", async () => {
 function renderTopology(areas, fallbackDevices) {
   const topology = byId("topology");
   const source = areas?.length ? areas : [{address: "—", name: "Nicht zugeordnete Geräte", lines: [{address: "—", name: "Geräte", medium: "Unbekannt", devices: fallbackDevices}]}];
-  topology.className = "topology-tree";
-  topology.innerHTML = source.map((area, areaIndex) => {
+  topology.className = "topology-layout";
+  topology.innerHTML = `<div class="topology-map">${renderTopologyMap(source)}</div><div class="topology-tree">${source.map((area, areaIndex) => {
     const areaCount = area.lines.reduce((sum, line) => sum + line.devices.length, 0);
     return `<details class="topology-area" ${areaIndex === 0 ? "open" : ""}>
       <summary class="area-header">
@@ -202,7 +210,7 @@ function renderTopology(areas, fallbackDevices) {
         <span class="node-summary" data-scope="area">${areaCount} Geräte · ${area.lines.length} Linien</span>
         <span class="chevron">⌄</span>
       </summary>
-      <div class="area-content">${area.lines.map((line, lineIndex) => `<details class="topology-line" ${areaIndex === 0 && lineIndex === 0 ? "open" : ""}>
+      <div class="area-content">${area.lines.map((line, lineIndex) => `<details class="topology-line" data-line-address="${escapeHtml(line.address)}" ${areaIndex === 0 && lineIndex === 0 ? "open" : ""}>
         <summary class="line-header">
           <span class="node-icon line-icon">L</span>
           <span class="node-copy"><small>LINIE ${escapeHtml(line.address)} · ${escapeHtml(line.medium)}</small><strong>${escapeHtml(line.name)}</strong></span>
@@ -213,12 +221,30 @@ function renderTopology(areas, fallbackDevices) {
         <div class="line-devices">${line.devices.map(deviceCard).join("") || '<p class="empty-line">Keine Geräte in dieser Linie</p>'}</div>
       </details>`).join("") || '<p class="empty-line">Keine Linien in diesem Bereich</p>'}</div>
     </details>`;
-  }).join("");
+  }).join("")}</div>`;
+  topology.querySelectorAll(".map-line-node").forEach((button) => button.addEventListener("click", () => {
+    const detail = topology.querySelector(`.topology-line[data-line-address="${CSS.escape(button.dataset.lineAddress)}"]`);
+    if (!detail) return;
+    detail.closest(".topology-area").open = true;
+    detail.open = true;
+    detail.scrollIntoView({behavior: "smooth", block: "center"});
+  }));
+}
+
+function renderTopologyMap(areas) {
+  return `<div class="map-root"><span>▣</span><strong>KNX-Projekt</strong><small>${areas.length} Bereiche</small></div>
+    <div class="map-trunk"></div>
+    <div class="map-areas">${areas.map((area) => {
+      const count = area.lines.reduce((sum, line) => sum + line.devices.length, 0);
+      return `<div class="map-area"><div class="map-area-node"><span>A</span><div><small>BEREICH ${escapeHtml(area.address)}</small><strong>${escapeHtml(area.name)}</strong><em>${count} Geräte</em></div></div>
+        <div class="map-lines">${area.lines.map((line) => `<button class="map-line-node" type="button" data-line-address="${escapeHtml(line.address)}"><span class="map-line-state">○</span><div><small>LINIE ${escapeHtml(line.address)}</small><strong>${escapeHtml(line.name)}</strong><em>${line.devices.length} Geräte</em></div></button>`).join("")}</div></div>`;
+    }).join("")}</div>`;
 }
 
 function deviceCard(device) {
-  return `<div class="device-card" data-address="${escapeHtml(device.address)}">
-    <span class="device-dot"></span><div><strong>${escapeHtml(device.address)}</strong><span>${escapeHtml(device.name)}</span><small>○ Noch nicht geprüft</small></div>
+  const isDummy = device.kind === "dummy";
+  return `<div class="device-card${isDummy ? " info-device" : ""}" data-address="${escapeHtml(device.address)}" data-name="${escapeHtml(device.name)}" data-kind="${escapeHtml(device.kind || "physical")}">
+    <span class="device-dot"></span><div><strong>${escapeHtml(device.address)}</strong><span>${escapeHtml(device.name)}</span><small>${isDummy ? "ℹ Info · virtuelles ETS-Gerät" : "○ Noch nicht geprüft"}</small></div>
   </div>`;
 }
 
@@ -227,19 +253,39 @@ function updateTopologySummaries() {
     const cards = [...line.querySelectorAll(".device-card")];
     const ok = cards.filter((card) => card.classList.contains("online")).length;
     const errors = cards.filter((card) => card.classList.contains("offline")).length;
-    const open = cards.length - ok - errors;
-    line.querySelector('[data-scope="line"]').textContent = `${cards.length} Geräte · ${ok} OK · ${errors} Fehler · ${open} offen`;
+    const infos = cards.filter((card) => card.classList.contains("info-device")).length;
+    const open = cards.length - ok - errors - infos;
+    line.querySelector('[data-scope="line"]').textContent = `${cards.length} Geräte · ${ok} OK · ${errors} Fehler · ${open} offen${infos ? ` · ${infos} Info` : ""}`;
     const status = line.querySelector(".line-status");
     status.className = `line-status ${errors ? "error" : open ? "unchecked" : "ok"}`;
     status.textContent = errors ? "Fehler" : open ? "offen" : "OK";
+    const mapNode = document.querySelector(`.map-line-node[data-line-address="${CSS.escape(line.dataset.lineAddress || "")}"]`);
+    if (mapNode) {
+      mapNode.className = `map-line-node ${errors ? "has-error" : open ? "has-open" : "is-ok"}`;
+      mapNode.querySelector(".map-line-state").textContent = errors ? "×" : open ? "!" : "✓";
+      mapNode.querySelector("em").textContent = `${ok}/${cards.length - infos} geprüft${errors ? ` · ${errors} Fehler` : ""}`;
+    }
   });
   document.querySelectorAll(".topology-area").forEach((area) => {
     const cards = [...area.querySelectorAll(".device-card")];
     const ok = cards.filter((card) => card.classList.contains("online")).length;
     const errors = cards.filter((card) => card.classList.contains("offline")).length;
-    const open = cards.length - ok - errors;
-    area.querySelector('[data-scope="area"]').textContent = `${cards.length} Geräte · ${ok} OK · ${errors} Fehler · ${open} offen`;
+    const infos = cards.filter((card) => card.classList.contains("info-device")).length;
+    const open = cards.length - ok - errors - infos;
+    area.querySelector('[data-scope="area"]').textContent = `${cards.length} Geräte · ${ok} OK · ${errors} Fehler · ${open} offen${infos ? ` · ${infos} Info` : ""}`;
   });
+  renderOpenPoints();
+}
+
+function renderOpenPoints() {
+  const panel = byId("open-points");
+  const offline = [...document.querySelectorAll('.device-card.offline[data-kind="physical"]')];
+  panel.hidden = false;
+  byId("open-points-count").textContent = offline.length;
+  byId("open-points-list").innerHTML = offline.length ? offline.map((card) => {
+    const line = card.closest(".topology-line")?.dataset.lineAddress || "—";
+    return `<div class="open-point-row"><span class="issue-badge">× Fehler</span><strong>${escapeHtml(card.dataset.address)}</strong><span>${escapeHtml(card.dataset.name)}</span><span>Keine Antwort · Gerät nicht erreichbar</span><small>Linie ${escapeHtml(line)}</small></div>`;
+  }).join("") : '<p class="no-open-points">Keine Fehler vorhanden. Dummys und virtuelle ETS-Geräte werden als Information behandelt.</p>';
 }
 
 function startMonitor() {

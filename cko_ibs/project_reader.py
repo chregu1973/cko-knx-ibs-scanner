@@ -22,6 +22,11 @@ def _format_dpt(dpt: Any) -> str | None:
     return str(main) if sub is None else f"{main}.{int(sub):03d}"
 
 
+def _device_kind(name: str) -> str:
+    """Classify non-physical ETS placeholders that must not be bus-tested."""
+    return "dummy" if "dummy" in name.casefold() else "physical"
+
+
 def _build_topology(topology: dict[str, Any], devices: dict[str, Any]) -> list[dict[str, Any]]:
     """Build an area/line/device tree suited for the graphical local UI."""
     areas: list[dict[str, Any]] = []
@@ -31,10 +36,12 @@ def _build_topology(topology: dict[str, Any], devices: dict[str, Any]) -> list[d
             line_devices = []
             for address in line.get("devices") or []:
                 device = devices.get(address, {})
+                device_name = _name(device, "Unbenanntes Gerät")
                 line_devices.append(
                     {
                         "address": str(address),
-                        "name": _name(device, "Unbenanntes Gerät"),
+                        "name": device_name,
+                        "kind": _device_kind(device_name),
                         "status": "unchecked",
                     }
                 )
@@ -67,10 +74,12 @@ def read_project(path: Path, password: str | None = None) -> dict[str, Any]:
 
     device_rows = []
     for address, device in devices.items():
+        device_name = _name(device, "Unbenanntes Gerät")
         device_rows.append(
             {
                 "address": str(address),
-                "name": _name(device, "Unbenanntes Gerät"),
+                "name": device_name,
+                "kind": _device_kind(device_name),
                 "status": "unchecked",
             }
         )
