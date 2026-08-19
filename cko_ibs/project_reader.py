@@ -71,9 +71,11 @@ def _parse_segments(tree: ElementTree.ElementTree) -> dict[str, list[dict[str, A
 
 
 def _read_segments(path: Path, password: str | None) -> dict[str, list[dict[str, Any]]]:
-    with extract(path, password or None) as contents:
-        with contents.open_project_0() as project_file:
-            return _parse_segments(ElementTree.parse(project_file))
+    with (
+        extract(path, password or None) as contents,
+        contents.open_project_0() as project_file,
+    ):
+        return _parse_segments(ElementTree.parse(project_file))
 
 
 def _classify_rf_segments(
