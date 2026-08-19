@@ -10,6 +10,7 @@ from cko_ibs.project_reader import (
     _classify_rf_segments,
     _device_kind,
     _format_dpt,
+    _parse_line_media,
     _parse_segments,
 )
 
@@ -124,6 +125,14 @@ def test_reads_ets6_rf_segments_and_classifies_rf_plus() -> None:
     policies = _classify_rf_segments(segments, {"1.1.67": {"name": "KNX RF-MSG-ST"}})
     assert segments["1.1"][0]["technology"] == "rf_plus"
     assert policies["1.1.67"] == "rf_plus"
+
+
+def test_reads_complete_line_medium_from_ets_xml() -> None:
+    xml = """<KNX><Project><Installations><Installation><Topology>
+      <Area Address="1"><Line Address="0" MediumTypeRefId="MT-5" /></Area>
+    </Topology></Installation></Installations></Project></KNX>"""
+    media = _parse_line_media(ElementTree.parse(StringIO(xml)))
+    assert media == {"1.0": "KNXnet/IP (IP)"}
 
 
 def test_automatic_connection_fallback_order() -> None:

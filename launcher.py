@@ -41,6 +41,15 @@ def _open_browser(url: str) -> None:
             time.sleep(0.5)
 
 
+def _application_is_running(url: str) -> bool:
+    """Return true only when our local service already owns the configured port."""
+    try:
+        with urllib.request.urlopen(f"{url}/api/health", timeout=1) as response:
+            return response.status == 200 and b'"local_only":true' in response.read().replace(b" ", b"")
+    except (OSError, urllib.error.URLError):
+        return False
+
+
 def main() -> None:
     log_path = _runtime_dir() / "CKO-KNX-IBS.log"
     try:
@@ -63,6 +72,10 @@ def main() -> None:
         host = "127.0.0.1"
         port = int(os.getenv("CKO_IBS_PORT", "8766"))
         url = f"http://{host}:{port}"
+        if _application_is_running(url):
+            LOGGER.info("Bereits laufende Instanz erkannt. Öffne vorhandene Oberfläche.")
+            webbrowser.open(url)
+            return
         threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
         LOGGER.info("CKO KNX IBS Scanner startet lokal auf %s", url)
         config = uvicorn.Config(app, host=host, port=port, log_config=None, access_log=False)

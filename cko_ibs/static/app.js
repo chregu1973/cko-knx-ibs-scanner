@@ -211,16 +211,18 @@ function renderTopology(areas, fallbackDevices) {
   topology.className = "topology-layout";
   topology.innerHTML = `<div class="topology-map"><svg class="map-flow-layer" aria-hidden="true"></svg>${renderTopologyMap(source)}</div><div class="topology-tree">${detailAreas.map((area, areaIndex) => {
     const areaCount = area.lines.reduce((sum, line) => sum + line.devices.length, 0);
+    const mainLine = area.lines.find((line) => line.role === "main");
+    const areaMedium = mediumKind(mainLine?.medium);
     return `<details class="topology-area" ${areaIndex === 0 ? "open" : ""}>
       <summary class="area-header">
-        <span class="node-icon area-icon">A</span>
+        <span class="node-icon area-icon medium-symbol ${areaMedium}">${mediumIcon(areaMedium)}</span>
         <span class="node-copy"><small>BEREICH ${escapeHtml(area.address)}</small><strong>${escapeHtml(area.name)}</strong></span>
         <span class="node-summary" data-scope="area">${areaCount} Geräte · ${area.lines.length} Linien</span>
         <span class="chevron">⌄</span>
       </summary>
       <div class="area-content">${area.lines.map((line, lineIndex) => `<details class="topology-line" data-line-address="${escapeHtml(line.full_address)}" ${areaIndex === 0 && lineIndex === 0 ? "open" : ""}>
         <summary class="line-header">
-          <span class="node-icon line-icon">L</span>
+          <span class="node-icon line-icon medium-symbol ${mediumKind(line.medium)}">${mediumIcon(mediumKind(line.medium))}</span>
           <span class="node-copy"><small>LINIE ${escapeHtml(line.full_address)} · ${escapeHtml(line.medium)}</small><strong>${escapeHtml(line.name)}</strong></span>
           <span class="node-summary" data-scope="line">${line.devices.length} Geräte · 0 OK · 0 Fehler</span>
           <span class="line-status unchecked">ungeprüft</span>
@@ -248,14 +250,29 @@ function renderTopologyMap(areas) {
   const backboneArea = areas.find((area) => String(area.address) === "0");
   const backbone = backboneArea?.lines.find((line) => line.role === "backbone");
   const installationAreas = areas.filter((area) => String(area.address) !== "0");
-  return `<div class="map-root" data-line-address="${escapeHtml(backbone?.full_address || "0.0")}"><span>▣</span><strong>IP-Backbone</strong><small>${escapeHtml(backbone?.full_address || "0.0")} · ${escapeHtml(backbone?.medium || "IP")}</small></div>
+  const backboneMedium = mediumKind(backbone?.medium || "IP");
+  return `<div class="map-root" data-line-address="${escapeHtml(backbone?.full_address || "0.0")}"><span class="medium-symbol ${backboneMedium}">${mediumIcon(backboneMedium)}</span><strong>IP-Backbone</strong><small>${escapeHtml(backbone?.full_address || "0.0")} · ${escapeHtml(backbone?.medium || "IP")}</small></div>
     <div class="map-areas">${installationAreas.map((area) => {
       const mainLine = area.lines.find((line) => line.role === "main");
       const subLines = area.lines.filter((line) => line.role === "subline");
       const count = area.lines.reduce((sum, line) => sum + line.devices.length, 0);
-      return `<div class="map-area"><button class="map-area-node" type="button" data-line-address="${escapeHtml(mainLine?.full_address || `${area.address}.0`)}"><span>A</span><div><small>BEREICH ${escapeHtml(area.address)} · ${escapeHtml(mainLine?.medium || "Unbekannt")}</small><strong>${escapeHtml(area.name)}</strong><em>${count} Geräte · Hauptlinie ${escapeHtml(mainLine?.full_address || `${area.address}.0`)}</em></div></button>
-        <div class="map-lines">${subLines.map((line) => `<button class="map-line-node" type="button" data-line-address="${escapeHtml(line.full_address)}"><span class="map-line-state">○</span><div><small>LINIE ${escapeHtml(line.full_address)} · ${escapeHtml(line.medium)}</small><strong>${escapeHtml(line.name)}</strong><em>${line.devices.length} Geräte${line.segments?.length ? ` · ${line.segments.length} Segmente` : ""}</em></div></button>`).join("")}</div></div>`;
+      const mainMedium = mediumKind(mainLine?.medium);
+      return `<div class="map-area"><button class="map-area-node" type="button" data-line-address="${escapeHtml(mainLine?.full_address || `${area.address}.0`)}"><span class="medium-symbol ${mainMedium}">${mediumIcon(mainMedium)}<i class="map-line-state">○</i></span><div><small>BEREICH ${escapeHtml(area.address)} · ${escapeHtml(mainLine?.medium || "Unbekannt")}</small><strong>${escapeHtml(area.name)}</strong><em>${count} Geräte · Hauptlinie ${escapeHtml(mainLine?.full_address || `${area.address}.0`)}</em></div></button>
+        <div class="map-lines">${subLines.map((line) => { const kind = mediumKind(line.medium); return `<button class="map-line-node" type="button" data-line-address="${escapeHtml(line.full_address)}"><span class="medium-symbol ${kind}">${mediumIcon(kind)}<i class="map-line-state">○</i></span><div><small>LINIE ${escapeHtml(line.full_address)} · ${escapeHtml(line.medium)}</small><strong>${escapeHtml(line.name)}</strong><em>${line.devices.length} Geräte${line.segments?.length ? ` · ${line.segments.length} Segmente` : ""}</em></div></button>`; }).join("")}</div></div>`;
     }).join("")}</div>`;
+}
+
+function mediumKind(medium = "") {
+  const value = String(medium).toUpperCase();
+  if (value.includes("RF") || value.includes("FUNK")) return "rf";
+  if (value.includes("IP")) return "ip";
+  return "tp";
+}
+
+function mediumIcon(kind) {
+  if (kind === "ip") return '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="5" rx="1"/><rect x="14" y="4" width="7" height="5" rx="1"/><rect x="8.5" y="15" width="7" height="5" rx="1"/><path d="M6.5 9v3h11V9M12 12v3"/></svg>';
+  if (kind === "rf") return '<svg viewBox="0 0 24 24"><circle cx="12" cy="17.5" r="1.5"/><path d="M8.5 14a5 5 0 0 1 7 0M5.5 11a9 9 0 0 1 13 0M2.5 8a13 13 0 0 1 19 0"/></svg>';
+  return '<svg viewBox="0 0 24 24"><path d="M5 4c7 3 7 13 14 16M19 4C12 7 12 17 5 20M8 7h8M8 17h8"/></svg>';
 }
 
 function renderLineDevices(line) {
@@ -264,10 +281,12 @@ function renderLineDevices(line) {
     const segmentDevices = line.devices.filter((device) => segment.devices.includes(device.address));
     segmentDevices.forEach((device) => assigned.add(device.address));
     const technology = segment.technology === "rf_multi" ? "RF Multi · voll prüfbar" : segment.technology === "rf_plus" ? "RF+ · versorgungsabhängig" : segment.medium;
-    return `<section class="segment-group ${escapeHtml(segment.technology)}"><header><span>⌁</span><div><strong>${escapeHtml(segment.name)}</strong><small>${escapeHtml(technology)}</small></div><em>${segmentDevices.length} Geräte</em></header><div class="segment-devices">${segmentDevices.map(deviceCard).join("") || '<p class="empty-line">Keine adressierten Geräte</p>'}</div></section>`;
+    const segmentKind = mediumKind(segment.medium);
+    return `<section class="segment-group ${escapeHtml(segment.technology)}"><header><span class="medium-symbol ${segmentKind}">${mediumIcon(segmentKind)}</span><div><strong>${escapeHtml(segment.name)}</strong><small>${escapeHtml(technology)}</small></div><em>${segmentDevices.length} Geräte</em></header><div class="segment-devices">${segmentDevices.map(deviceCard).join("") || '<p class="empty-line">Keine adressierten Geräte</p>'}</div></section>`;
   }).join("");
   const unassigned = line.devices.filter((device) => !assigned.has(device.address));
-  const regular = unassigned.length ? `<section class="segment-group standard"><header><span>▦</span><div><strong>${line.segments?.length ? "TP-/Liniengeräte" : "Geräte"}</strong><small>${escapeHtml(line.medium)}</small></div><em>${unassigned.length} Geräte</em></header><div class="segment-devices">${unassigned.map(deviceCard).join("")}</div></section>` : "";
+  const lineKind = mediumKind(line.medium);
+  const regular = unassigned.length ? `<section class="segment-group standard"><header><span class="medium-symbol ${lineKind}">${mediumIcon(lineKind)}</span><div><strong>${line.segments?.length ? "TP-/Liniengeräte" : "Geräte"}</strong><small>${escapeHtml(line.medium)}</small></div><em>${unassigned.length} Geräte</em></header><div class="segment-devices">${unassigned.map(deviceCard).join("")}</div></section>` : "";
   return segments || regular ? `${segments}${regular}` : '<p class="empty-line">Keine Geräte in dieser Linie</p>';
 }
 

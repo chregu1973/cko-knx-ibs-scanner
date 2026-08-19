@@ -70,12 +70,28 @@ def _parse_segments(tree: ElementTree.ElementTree) -> dict[str, list[dict[str, A
     return result
 
 
-def _read_segments(path: Path, password: str | None) -> dict[str, list[dict[str, Any]]]:
+def _parse_line_media(tree: ElementTree.ElementTree) -> dict[str, str]:
+    """Read the medium assigned to every complete line address from ETS XML."""
+    result: dict[str, str] = {}
+    for area in tree.findall(".//{*}Topology/{*}Area"):
+        area_address = str(area.get("Address", "0"))
+        for line in area.findall("{*}Line"):
+            full_line = _full_line_address(area_address, str(line.get("Address", "0")))
+            reference = line.get("MediumTypeRefId")
+            if reference:
+                result[full_line] = _medium_name(reference)
+    return result
+
+
+def _read_topology_extensions(
+    path: Path, password: str | None
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, str]]:
     with (
         extract(path, password or None) as contents,
         contents.open_project_0() as project_file,
     ):
-        return _parse_segments(ElementTree.parse(project_file))
+        tree = ElementTree.parse(project_file)
+        return _parse_segments(tree), _parse_line_media(tree)
 
 
 def _classify_rf_segments(
@@ -104,6 +120,7 @@ def _build_topology(
     devices: dict[str, Any],
     segments: dict[str, list[dict[str, Any]]] | None = None,
     policies: dict[str, str] | None = None,
+    line_media: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Build an area/line/device tree suited for the graphical local UI."""
     areas: list[dict[str, Any]] = []
@@ -136,7 +153,9 @@ def _build_topology(
                     "address": str(line_address),
                     "full_address": full_line,
                     "name": _name(line, f"Linie {line_address}"),
-                    "medium": str(line.get("medium_type") or "Unbekannt"),
+                    "medium": (line_media or {}).get(
+                        full_line, str(line.get("medium_type") or "Unbekannt")
+                    ),
                     "role": "backbone" if full_line == "0.0" else "main" if full_line.endswith(".0") else "subline",
                     "segments": (segments or {}).get(full_line, []),
                     "devices": line_devices,
@@ -161,7 +180,7 @@ def read_project(path: Path, password: str | None = None) -> dict[str, Any]:
     topology = project.get("topology", {}) or {}
     locations = project.get("locations", {}) or {}
 
-    segments = _read_segments(path, password)
+    segments, line_media = _read_topology_extensions(path, password)
     policies = _classify_rf_segments(segments, devices)
     device_rows = []
     for address, device in devices.items():
@@ -194,6 +213,8 @@ def read_project(path: Path, password: str | None = None) -> dict[str, Any]:
         "location_count": len(locations),
         "topology_node_count": len(topology),
         "devices": sorted(device_rows, key=lambda item: tuple(int(x) for x in item["address"].split("."))),
-        "topology": _build_topology(topology, devices, segments, policies),
+        "topology": _build_topology(
+            topology, devices, segments, policies, line_media
+        ),
         "group_addresses": group_address_rows,
     }
