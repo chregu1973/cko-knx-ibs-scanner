@@ -170,6 +170,7 @@ byId("test-connection-button").addEventListener("click", async () => {
         : `<strong>✓ Aktive KNX-Quelladresse: ${escapeHtml(data.individual_address || "nicht ermittelt")}</strong><br>Diese Adresse wurde vom KNX/IP-Tunnel bestätigt. Für parallele Verbindungen muss jede Tunneladresse eindeutig sein.`;
     byId("device-scan-button").disabled = projectDevices.length === 0;
     busConnected = true;
+    byId("disconnect-button").hidden = false;
     startMonitor();
   } catch (error) {
     message.className = "message error";
@@ -178,8 +179,39 @@ byId("test-connection-button").addEventListener("click", async () => {
     byId("connection-badge").textContent = "○ Nicht verbunden";
     byId("tunnel-diagnostic").hidden = true;
     busConnected = false;
+    byId("disconnect-button").hidden = true;
   } finally {
     button.disabled = false;
+  }
+});
+
+byId("disconnect-button").addEventListener("click", async () => {
+  const button = byId("disconnect-button");
+  button.disabled = true;
+  button.textContent = "Verbindung wird getrennt …";
+  cancelAddressScan = true;
+  try {
+    const response = await fetch("/api/knx/disconnect", {method: "POST"});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Verbindung konnte nicht getrennt werden");
+    if (monitorSocket) {
+      monitorSocket.close();
+      monitorSocket = null;
+    }
+    busConnected = false;
+    byId("connection-badge").className = "badge muted";
+    byId("connection-badge").textContent = "○ Nicht verbunden";
+    byId("connection-message").className = "message success";
+    byId("connection-message").textContent = "KNX-Verbindung und Telegrammmonitor wurden sauber getrennt.";
+    byId("tunnel-diagnostic").hidden = true;
+    byId("device-scan-button").disabled = true;
+    button.hidden = true;
+  } catch (error) {
+    byId("connection-message").className = "message error";
+    byId("connection-message").textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Verbindung trennen";
   }
 });
 

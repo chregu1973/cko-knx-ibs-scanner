@@ -225,9 +225,18 @@ class BusConnection:
 
     async def check_device(self, address: str) -> bool:
         if not self.connected or self.xknx is None:
-            raise RuntimeError("Keine aktive KNX/IP-Verbindung.")
-        async with asyncio.timeout(6):
-            return await nm_individual_address_check(self.xknx, address)
+            raise RuntimeError("Keine aktive KNX-Verbindung.")
+        try:
+            async with asyncio.timeout(6):
+                return await nm_individual_address_check(self.xknx, address)
+        except XKNXException as exc:
+            detail = str(exc).lower()
+            if "l_data_con" in detail or "confirmation timed out" in detail:
+                raise RuntimeError(
+                    "Keine lokale Bestätigung vom KNX-Bus. Verbindung zur KNX-Linie, "
+                    "Busspannung und Belegung der Schnittstelle durch ETS prüfen."
+                ) from exc
+            raise
 
     def status(self, message: str | None = None) -> dict[str, Any]:
         current_address = str(self.xknx.current_address) if self.xknx is not None else None
