@@ -22,6 +22,18 @@
 .usb-controls label { display:grid; gap:6px; color:var(--muted); font-size:11px; }
 .usb-controls select { width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; background:#09121c; color:#fff; }
 .usb-controls p { grid-column:1/-1; }
+.usb-controls .usb-required { padding:9px 11px; border:1px solid #9a661d; border-radius:8px; background:#2a1e0d; color:#ffc66f; }
+.address-scan-panel { margin-bottom:18px; }
+.address-scan-controls { display:grid; grid-template-columns:repeat(4,minmax(90px,.45fr)) minmax(150px,1fr); gap:10px; align-items:end; }
+.address-scan-controls label { display:grid; gap:6px; color:var(--muted); font-size:11px; }
+.address-scan-controls input { width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; background:#0c141f; color:#fff; }
+.scan-hint { margin:10px 0 14px; color:var(--muted); font-size:10px; line-height:1.5; }
+.address-scan-results { display:grid; grid-template-columns:repeat(auto-fill,minmax(125px,1fr)); gap:8px; min-height:48px; }
+.address-scan-results.empty { display:flex; align-items:center; justify-content:center; border:1px dashed var(--line); border-radius:8px; color:var(--muted); font-size:11px; }
+.found-address { display:flex; gap:8px; align-items:center; padding:10px 12px; border:1px solid #256d50; border-radius:8px; background:#0d1d18; color:#e8fff5; font-weight:750; }
+.found-address::before { content:"✓"; color:var(--green); }
+.scan-summary { grid-column:1/-1; padding:10px 12px; border:1px solid #315276; border-radius:8px; background:#102235; color:#9ed5ff; font-size:11px; }
+@media(max-width:900px){.address-scan-controls{grid-template-columns:repeat(2,1fr)}.address-scan-controls button{grid-column:1/-1}}
 
 .connection-controls select,
 .connection-controls input {

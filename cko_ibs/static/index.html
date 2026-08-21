@@ -70,7 +70,7 @@
             <label>Gefundene USB-Schnittstelle
               <select id="usb-device-select"><option value="">Automatisch auswählen</option></select>
             </label>
-            <p>Die physikalische Adresse wird als Quelladresse für Diagnoseabfragen verwendet und darf keinem vorhandenen Gerät entsprechen.</p>
+            <p class="usb-required">⚠ Bei USB ist eine freie physikalische Quelladresse zwingend. Ohne Eingabe würde 0.0.0 verwendet; damit funktionieren linienübergreifende Diagnoseabfragen nicht.</p>
           </div>
           <div id="tunnel-diagnostic" class="tunnel-diagnostic" hidden></div>
           <div id="secure-controls" class="secure-controls" hidden>
@@ -93,6 +93,20 @@
           <p id="connection-message" class="message"></p>
           <div id="gateway-list" class="empty-state"><span>⌁</span><strong>Noch keine Suche durchgeführt</strong><small>KNX/IP wird im Netzwerk gesucht; USB-Schnittstellen werden lokal erkannt.</small></div>
         </article>
+      </section>
+
+      <section class="panel address-scan-panel">
+        <div class="panel-heading"><div><p class="eyebrow">OHNE ETS-PROJEKT NUTZBAR</p><h2>Physikalische Adressen suchen</h2></div><span class="badge info">KNX-Linienscan</span></div>
+        <div class="address-scan-controls">
+          <label>Bereich<input id="scan-area" type="number" min="0" max="15" value="1" /></label>
+          <label>Linie<input id="scan-line" type="number" min="0" max="15" value="1" /></label>
+          <label>Von Gerät<input id="scan-device-from" type="number" min="1" max="255" value="1" /></label>
+          <label>Bis Gerät<input id="scan-device-to" type="number" min="1" max="255" value="255" /></label>
+          <button id="address-scan-button" class="primary" type="button">Linie scannen</button>
+        </div>
+        <p class="scan-hint">Ermittelt antwortende physikalische Adressen direkt am Bus. Kopplerfilter, RF+-Geräte ohne Versorgung und nicht erreichbare Segmente können das Ergebnis einschränken.</p>
+        <div id="address-scan-progress" class="scan-progress" hidden><span></span><small>0 / 0 Adressen geprüft</small></div>
+        <div id="address-scan-results" class="address-scan-results empty"><span>Noch kein Scan durchgeführt.</span></div>
       </section>
 
       <section class="panel topology-panel">

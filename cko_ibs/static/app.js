@@ -2,6 +2,8 @@ const byId = (id) => document.getElementById(id);
 let projectDevices = [];
 let monitorSocket = null;
 let topologyFlowResizeBound = false;
+let cancelAddressScan = false;
+let busConnected = false;
 
 async function loadAdapters() {
   const select = byId("adapter-select");
@@ -25,6 +27,12 @@ loadAdapters();
 
 function updateConnectionMode() {
   const mode = byId("connection-mode").value;
+  if (mode === "usb" && !individualAddress) {
+    message.className = "message error";
+    message.textContent = "Für KNX USB muss zwingend eine freie physikalische Quelladresse eingetragen werden.";
+    byId("individual-address").focus();
+    return;
+  }
   const usb = mode === "usb";
   byId("secure-controls").hidden = mode !== "tcp_secure";
   byId("usb-controls").hidden = !usb;
@@ -161,6 +169,7 @@ byId("test-connection-button").addEventListener("click", async () => {
         ? `<strong>✓ ${escapeHtml(data.usb_device?.name || "KNX USB")} aktiv</strong><br>KNX-Quelladresse: ${escapeHtml(data.individual_address || "0.0.0")}. Für linienübergreifende Prüfungen eine freie Adresse aus der passenden Topologie verwenden.`
         : `<strong>✓ Aktive KNX-Quelladresse: ${escapeHtml(data.individual_address || "nicht ermittelt")}</strong><br>Diese Adresse wurde vom KNX/IP-Tunnel bestätigt. Für parallele Verbindungen muss jede Tunneladresse eindeutig sein.`;
     byId("device-scan-button").disabled = projectDevices.length === 0;
+    busConnected = true;
     startMonitor();
   } catch (error) {
     message.className = "message error";
@@ -168,9 +177,87 @@ byId("test-connection-button").addEventListener("click", async () => {
     byId("connection-badge").className = "badge muted";
     byId("connection-badge").textContent = "○ Nicht verbunden";
     byId("tunnel-diagnostic").hidden = true;
+    busConnected = false;
   } finally {
     button.disabled = false;
   }
+});
+
+byId("address-scan-button").addEventListener("click", async () => {
+  const button = byId("address-scan-button");
+  if (button.dataset.running === "true") {
+    cancelAddressScan = true;
+    button.textContent = "Scan wird beendet …";
+    button.disabled = true;
+    return;
+  }
+  const results = byId("address-scan-results");
+  if (!busConnected) {
+    results.className = "address-scan-results empty";
+    results.innerHTML = "<span>Bitte zuerst eine KNX/IP- oder KNX-USB-Verbindung aufbauen.</span>";
+    return;
+  }
+  const area = Number(byId("scan-area").value);
+  const line = Number(byId("scan-line").value);
+  const first = Number(byId("scan-device-from").value);
+  const last = Number(byId("scan-device-to").value);
+  if (area < 0 || area > 15 || line < 0 || line > 15 || first < 1 || last > 255 || first > last) {
+    results.className = "address-scan-results empty";
+    results.innerHTML = "<span>Ungültiger Adressbereich. Bereich/Linie 0–15, Geräte 1–255.</span>";
+    return;
+  }
+
+  const addresses = Array.from({length: last - first + 1}, (_, index) => `${area}.${line}.${first + index}`);
+  const sourceAddress = byId("individual-address").value.trim();
+  const scanAddresses = addresses.filter((address) => address !== sourceAddress);
+  if (!scanAddresses.length) {
+    results.className = "address-scan-results empty";
+    results.innerHTML = "<span>Der Scanbereich enthält ausschließlich die eigene Quelladresse.</span>";
+    return;
+  }
+  const found = [];
+  const progress = byId("address-scan-progress");
+  const bar = progress.querySelector("span");
+  const label = progress.querySelector("small");
+  let completed = 0;
+  cancelAddressScan = false;
+  button.dataset.running = "true";
+  button.textContent = "Scan abbrechen";
+  progress.hidden = false;
+  bar.style.width = "0";
+  results.className = "address-scan-results";
+  results.innerHTML = '<div class="scan-summary">Scan läuft … Je nach Adressbereich und Busantwort kann dies einige Minuten dauern.</div>';
+
+  const checkAddress = async (address) => {
+    try {
+      const response = await fetch("/api/knx/check-device", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({address}),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Prüfung fehlgeschlagen");
+      if (data.online) found.push(address);
+    } catch (error) {
+      if (!cancelAddressScan) console.warn(`Adressprüfung ${address}:`, error);
+    } finally {
+      completed += 1;
+      bar.style.width = `${(completed / scanAddresses.length) * 100}%`;
+      label.textContent = `${completed} / ${scanAddresses.length} Adressen geprüft · ${found.length} gefunden`;
+      const cards = found.sort((a, b) => Number(a.split(".")[2]) - Number(b.split(".")[2])).map((address) => `<div class="found-address">${address}</div>`).join("");
+      results.innerHTML = `<div class="scan-summary">Linie ${area}.${line} · ${completed}/${scanAddresses.length} geprüft · ${found.length} belegt${sourceAddress ? ` · eigene Quelladresse ${escapeHtml(sourceAddress)} ausgelassen` : ""}</div>${cards}`;
+    }
+  };
+
+  for (let index = 0; index < scanAddresses.length && !cancelAddressScan; index += 4) {
+    await Promise.all(scanAddresses.slice(index, index + 4).map(checkAddress));
+  }
+  button.dataset.running = "false";
+  button.disabled = false;
+  button.textContent = "Linie erneut scannen";
+  const state = cancelAddressScan ? "abgebrochen" : "abgeschlossen";
+  const cards = found.sort((a, b) => Number(a.split(".")[2]) - Number(b.split(".")[2])).map((address) => `<div class="found-address">${address}</div>`).join("");
+  results.innerHTML = `<div class="scan-summary">Scan ${state}: Linie ${area}.${line} · ${completed} geprüft · ${found.length} belegte Adressen gefunden${sourceAddress ? ` · eigene Quelladresse ${escapeHtml(sourceAddress)} ausgelassen` : ""}</div>${cards || '<span>Keine antwortende Adresse gefunden.</span>'}`;
 });
 
 byId("project-file").addEventListener("change", (event) => {

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from cko_ibs import usb_connection
+from cko_ibs.bus_connection import BusConnection
 
 
 def test_knx_usb_hid_single_report_roundtrip() -> None:
@@ -44,3 +47,11 @@ def test_discovers_siemens_oci702(monkeypatch) -> None:
     assert len(devices) == 1
     assert devices[0].name == "Siemens OCI702 USB (Siemens HVAC)"
     assert devices[0].to_dict()["serial_number"] == "4711"
+
+
+@pytest.mark.asyncio
+async def test_usb_connection_requires_physical_source_address() -> None:
+    connection = BusConnection()
+
+    with pytest.raises(ValueError, match="Quelladresse zwingend"):
+        await connection.connect_usb(individual_address=None)

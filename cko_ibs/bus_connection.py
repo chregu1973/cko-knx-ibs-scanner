@@ -102,13 +102,17 @@ class BusConnection:
     ) -> dict[str, Any]:
         """Connect directly to a Siemens OCI702 KNX USB HID interface."""
         requested_address = self._validate_individual_address(individual_address)
+        if requested_address is None:
+            raise ValueError(
+                "Für KNX USB ist eine freie physikalische Quelladresse zwingend erforderlich. "
+                "Ohne Angabe würde 0.0.0 verwendet und die Diagnose funktioniert nicht zuverlässig."
+            )
         device = find_usb_device(device_id)
         async with self._lock:
             await self._disconnect_unlocked()
             candidate = XKNX(telegram_received_cb=self._on_telegram)
             candidate.knxip_interface = KNXUSBInterface(candidate, device)
-            if requested_address:
-                candidate.current_address = IndividualAddress(requested_address)
+            candidate.current_address = IndividualAddress(requested_address)
             try:
                 async with asyncio.timeout(8):
                     await candidate.start()

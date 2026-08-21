@@ -3,7 +3,7 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
-## Version 0.4.0
+## Version 0.5.0
 
 - Direkte KNX-USB-Verbindung über USB-HID/cEMI
 - Siemens OCI702 USB als erstes Referenzmodell
@@ -11,12 +11,14 @@ KNX/IP- und KNX-USB-Diagnose.
 - Telegrammmonitor und Geräteprüfung über dieselbe USB-Verbindung
 - wählbare physikalische Quelladresse für linienübergreifende Diagnose
 - noch nicht implementierte Sidebar-Bereiche sind als „folgt“ deaktiviert
+- USB-Verbindungen erfordern zwingend eine freie physikalische Quelladresse
+- eigenständiger Linienscan nach belegten physikalischen Adressen ohne ETS-Projekt
 
 Vor dem Öffnen der OCI702 muss die ETS-Verbindung zur USB-Schnittstelle getrennt werden.
 Eine USB-Schnittstelle kann normalerweise nicht gleichzeitig von ETS und dem IBS Scanner
 verwendet werden.
 
-## Stand v0.1
+## Funktionsumfang
 
 Der erste Prototyp bietet:
 
