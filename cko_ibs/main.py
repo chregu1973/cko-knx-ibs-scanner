@@ -213,6 +213,23 @@ async def check_device(request: DeviceCheckRequest) -> dict:
     return {"address": request.address, "online": online}
 
 
+@app.post("/api/knx/device-info")
+async def device_info(request: DeviceCheckRequest) -> dict:
+    try:
+        return await bus_connection.read_device_info(request.address)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        raise HTTPException(
+            status_code=504,
+            detail="Geräteinformation nicht beantwortet. Gerät oder Segment ist nicht erreichbar.",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Geräteinformation fehlgeschlagen: {exc}") from exc
+
+
 @app.websocket("/api/knx/monitor")
 async def telegram_monitor(websocket: WebSocket) -> None:
     await websocket.accept()

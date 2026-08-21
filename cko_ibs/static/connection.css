@@ -30,9 +30,23 @@
 .scan-hint { margin:10px 0 14px; color:var(--muted); font-size:10px; line-height:1.5; }
 .address-scan-results { display:grid; grid-template-columns:repeat(auto-fill,minmax(125px,1fr)); gap:8px; min-height:48px; }
 .address-scan-results.empty { display:flex; align-items:center; justify-content:center; border:1px dashed var(--line); border-radius:8px; color:var(--muted); font-size:11px; }
-.found-address { display:flex; gap:8px; align-items:center; padding:10px 12px; border:1px solid #256d50; border-radius:8px; background:#0d1d18; color:#e8fff5; font-weight:750; }
+.found-address { display:flex; gap:8px; align-items:center; padding:10px 12px; border:1px solid #256d50; border-radius:8px; background:#0d1d18; color:#e8fff5; font:inherit; font-weight:750; cursor:pointer; text-align:left; }
 .found-address::before { content:"✓"; color:var(--green); }
+.found-address:hover,.found-address.selected { border-color:#42bfff; background:#10283a; box-shadow:0 0 0 2px #178ee033; }
 .scan-summary { grid-column:1/-1; padding:10px 12px; border:1px solid #315276; border-radius:8px; background:#102235; color:#9ed5ff; font-size:11px; }
+.device-info-panel { margin-top:14px; padding:16px; border:1px solid #315276; border-radius:10px; background:linear-gradient(135deg,#0c1b29,#0c141f); }
+.device-info-panel[hidden] { display:none; }
+.device-info-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.device-info-heading h3 { margin:3px 0 0; font-size:20px; }
+.device-info-empty { color:var(--muted); font-size:11px; }
+.device-info-summary { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.device-info-quality { padding:5px 9px; border:1px solid #94651e; border-radius:999px; background:#2a1e0d; color:#ffc66f; font-size:10px; font-weight:800; }
+.device-info-quality.exact { border-color:#256d50; background:#0d2b20; color:#70e5ae; }
+.device-info-quality.basic { border-color:#43536a; background:#182230; color:#aab7c9; }
+.device-info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:8px; }
+.device-info-item { padding:10px 12px; border:1px solid #253a50; border-radius:8px; background:#0a131e; }
+.device-info-item small { display:block; margin-bottom:4px; color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.08em; }
+.device-info-item strong { color:#edf7ff; font-size:12px; overflow-wrap:anywhere; }
 @media(max-width:900px){.address-scan-controls{grid-template-columns:repeat(2,1fr)}.address-scan-controls button{grid-column:1/-1}}
 
 .connection-controls select,

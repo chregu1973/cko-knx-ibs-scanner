@@ -3,7 +3,14 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
-## Version 0.5.1
+## Version 0.6.0
+
+Neu: Nach einem physikalischen Adressscan kann eine gefundene Adresse ausgewählt
+und über **Gerätedaten lesen** abgefragt werden. Das Tool liest – soweit vom Gerät
+unterstützt – Maskenversion, Herstellerkennung, Seriennummer, Firmware,
+Programmversion, Bestellinformation, Objektname und PEI-Typ. Nicht jedes KNX-Gerät
+stellt alle standardisierten Management-Eigenschaften bereit; fehlende Angaben
+werden deshalb nicht als Gerätefehler bewertet.
 
 - Direkte KNX-USB-Verbindung über USB-HID/cEMI
 - Siemens OCI702 USB als erstes Referenzmodell

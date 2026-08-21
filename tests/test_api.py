@@ -54,6 +54,27 @@ def test_device_check_requires_connection() -> None:
     assert response.status_code == 409
 
 
+def test_device_info_endpoint(monkeypatch) -> None:
+    async def fake_read_device_info(address: str) -> dict:
+        return {
+            "address": address,
+            "mask_version": "0x07B0",
+            "manufacturer_name": "Siemens",
+            "quality": "partial",
+            "quality_label": "Teilweise erkannt",
+        }
+
+    monkeypatch.setattr("cko_ibs.main.bus_connection.read_device_info", fake_read_device_info)
+    response = client.post("/api/knx/device-info", json={"address": "1.1.10"})
+    assert response.status_code == 200
+    assert response.json()["manufacturer_name"] == "Siemens"
+
+
+def test_formats_readable_management_property() -> None:
+    assert BusConnection._readable_property(b"OCI702\x00\x00") == "OCI702"
+    assert BusConnection._readable_property(b"\x00\x01\x02") == "00 01 02"
+
+
 def test_formats_ets_dpt() -> None:
     assert _format_dpt({"main": 1, "sub": 1}) == "1.001"
     assert _format_dpt({"main": 9, "sub": None}) == "9"

@@ -12,10 +12,24 @@ from xknx import XKNX
 from xknx.exceptions import XKNXException
 from xknx.io import ConnectionConfig, ConnectionType, SecureConfig
 from xknx.management.procedures import nm_individual_address_check
-from xknx.telegram import Telegram
+from xknx.telegram import Telegram, apci
 from xknx.telegram.address import IndividualAddress
 
 from cko_ibs.usb_connection import KNXUSBInterface, find_usb_device
+
+DEVICE_OBJECT_PROPERTIES = {
+    "object_name": 2,
+    "firmware_revision": 9,
+    "serial_number": 11,
+    "manufacturer_id": 12,
+    "program_version": 13,
+    "order_info": 15,
+    "pei_type": 16,
+}
+
+# Manufacturer ID 1 is defined for Siemens in the KNX manufacturer table.
+# Unknown IDs deliberately remain numeric instead of being guessed.
+KNX_MANUFACTURERS = {1: "Siemens"}
 
 
 def connection_attempts(mode: str) -> list[tuple[str, ConnectionType, bool]]:
@@ -237,6 +251,117 @@ class BusConnection:
                     "Busspannung und Belegung der Schnittstelle durch ETS prüfen."
                 ) from exc
             raise
+
+    async def read_device_info(self, address: str) -> dict[str, Any]:
+        """Read standardized KNX management information from one device.
+
+        Older devices do not implement every interface-object property. Those
+        fields are therefore collected independently and never make the whole
+        device-information request fail.
+        """
+        if not self.connected or self.xknx is None:
+            raise RuntimeError("Keine aktive KNX-Verbindung.")
+        try:
+            target = IndividualAddress(address.strip())
+        except (AttributeError, XKNXException) as exc:
+            raise ValueError("Ungültige physikalische KNX-Adresse.") from exc
+
+        result: dict[str, Any] = {
+            "address": str(target),
+            "mask_version": None,
+            "manufacturer_id": None,
+            "manufacturer_name": None,
+            "serial_number": None,
+            "firmware_revision": None,
+            "program_version": None,
+            "order_info": None,
+            "object_name": None,
+            "pei_type": None,
+            "quality": "basic",
+            "quality_label": "Nur Grunddaten",
+            "unavailable": [],
+        }
+
+        async with asyncio.timeout(24):
+            async with self.xknx.management.connection(target) as connection:
+                descriptor_telegram = await connection.request(
+                    apci.DeviceDescriptorRead(descriptor=0),
+                    expected=apci.DeviceDescriptorResponse,
+                )
+                descriptor = descriptor_telegram.payload
+                if isinstance(descriptor, apci.DeviceDescriptorResponse):
+                    result["mask_version"] = f"0x{descriptor.value:04X}"
+
+                raw_properties: dict[str, bytes] = {}
+                for name, property_id in DEVICE_OBJECT_PROPERTIES.items():
+                    try:
+                        async with asyncio.timeout(3.5):
+                            telegram = await connection.request(
+                                apci.PropertyValueRead(
+                                    object_index=0,
+                                    property_id=property_id,
+                                    count=1,
+                                    start_index=1,
+                                ),
+                                expected=apci.PropertyValueResponse,
+                            )
+                        payload = telegram.payload
+                        if isinstance(payload, apci.PropertyValueResponse) and payload.data:
+                            raw_properties[name] = payload.data
+                        else:
+                            result["unavailable"].append(name)
+                    except (TimeoutError, XKNXException):
+                        result["unavailable"].append(name)
+
+        manufacturer = raw_properties.get("manufacturer_id")
+        if manufacturer:
+            manufacturer_id = int.from_bytes(manufacturer, "big")
+            result["manufacturer_id"] = f"0x{manufacturer_id:04X}"
+            result["manufacturer_name"] = KNX_MANUFACTURERS.get(manufacturer_id)
+        serial = raw_properties.get("serial_number")
+        if serial:
+            result["serial_number"] = serial.hex("-").upper()
+        firmware = raw_properties.get("firmware_revision")
+        if firmware:
+            result["firmware_revision"] = ".".join(str(byte) for byte in firmware)
+        program = raw_properties.get("program_version")
+        if program:
+            result["program_version"] = program.hex(" ").upper()
+        order = raw_properties.get("order_info")
+        if order:
+            result["order_info"] = self._readable_property(order)
+        object_name = raw_properties.get("object_name")
+        if object_name:
+            result["object_name"] = self._readable_property(object_name)
+        pei = raw_properties.get("pei_type")
+        if pei:
+            result["pei_type"] = str(int.from_bytes(pei, "big"))
+
+        recognized_fields = sum(
+            result[field] is not None
+            for field in (
+                "manufacturer_id",
+                "serial_number",
+                "firmware_revision",
+                "program_version",
+                "order_info",
+                "object_name",
+            )
+        )
+        if result["manufacturer_name"] and result["order_info"]:
+            result["quality"] = "exact"
+            result["quality_label"] = "Eindeutig erkannt"
+        elif recognized_fields:
+            result["quality"] = "partial"
+            result["quality_label"] = "Teilweise erkannt"
+        return result
+
+    @staticmethod
+    def _readable_property(value: bytes) -> str:
+        text = value.rstrip(b"\x00\xff ").decode("latin-1", errors="replace").strip()
+        if text and all(character.isprintable() for character in text):
+            return text
+        return value.hex(" ").upper()
 
     def status(self, message: str | None = None) -> dict[str, Any]:
         current_address = str(self.xknx.current_address) if self.xknx is not None else None

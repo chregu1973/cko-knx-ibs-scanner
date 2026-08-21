@@ -4,6 +4,14 @@ let monitorSocket = null;
 let topologyFlowResizeBound = false;
 let cancelAddressScan = false;
 let busConnected = false;
+let selectedScanAddress = null;
+
+function addressCards(found) {
+  return found
+    .sort((a, b) => Number(a.split(".")[2]) - Number(b.split(".")[2]))
+    .map((address) => `<button class="found-address${address === selectedScanAddress ? " selected" : ""}" type="button" data-address="${escapeHtml(address)}">${escapeHtml(address)}</button>`)
+    .join("");
+}
 
 async function loadAdapters() {
   const select = byId("adapter-select");
@@ -276,7 +284,7 @@ byId("address-scan-button").addEventListener("click", async () => {
       completed += 1;
       bar.style.width = `${(completed / scanAddresses.length) * 100}%`;
       label.textContent = `${completed} / ${scanAddresses.length} Adressen geprüft · ${found.length} gefunden`;
-      const cards = found.sort((a, b) => Number(a.split(".")[2]) - Number(b.split(".")[2])).map((address) => `<div class="found-address">${address}</div>`).join("");
+      const cards = addressCards(found);
       results.innerHTML = `<div class="scan-summary">Linie ${area}.${line} · ${completed}/${scanAddresses.length} geprüft · ${found.length} belegt${sourceAddress ? ` · eigene Quelladresse ${escapeHtml(sourceAddress)} ausgelassen` : ""}</div>${cards}`;
     }
   };
@@ -288,8 +296,57 @@ byId("address-scan-button").addEventListener("click", async () => {
   button.disabled = false;
   button.textContent = "Linie erneut scannen";
   const state = cancelAddressScan ? "abgebrochen" : "abgeschlossen";
-  const cards = found.sort((a, b) => Number(a.split(".")[2]) - Number(b.split(".")[2])).map((address) => `<div class="found-address">${address}</div>`).join("");
+  const cards = addressCards(found);
   results.innerHTML = `<div class="scan-summary">Scan ${state}: Linie ${area}.${line} · ${completed} geprüft · ${found.length} belegte Adressen gefunden${sourceAddress ? ` · eigene Quelladresse ${escapeHtml(sourceAddress)} ausgelassen` : ""}</div>${cards || '<span>Keine antwortende Adresse gefunden.</span>'}`;
+});
+
+byId("address-scan-results").addEventListener("click", (event) => {
+  const card = event.target.closest(".found-address");
+  if (!card) return;
+  selectedScanAddress = card.dataset.address;
+  document.querySelectorAll(".found-address").forEach((item) => item.classList.toggle("selected", item === card));
+  byId("device-info-panel").hidden = false;
+  byId("device-info-address").textContent = selectedScanAddress;
+  byId("device-info-result").className = "device-info-empty";
+  byId("device-info-result").textContent = "Gerätedaten wurden noch nicht gelesen.";
+});
+
+byId("read-device-info-button").addEventListener("click", async () => {
+  if (!selectedScanAddress) return;
+  const button = byId("read-device-info-button");
+  const result = byId("device-info-result");
+  button.disabled = true;
+  button.textContent = "Gerät wird gelesen …";
+  result.className = "device-info-empty";
+  result.textContent = "Standardisierte KNX-Geräteinformationen werden abgefragt …";
+  try {
+    const response = await fetch("/api/knx/device-info", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({address: selectedScanAddress}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Gerätedaten konnten nicht gelesen werden");
+    const fields = [
+      ["Maskenversion", data.mask_version],
+      ["Hersteller", data.manufacturer_name || data.manufacturer_id],
+      ["Hersteller-ID", data.manufacturer_name ? data.manufacturer_id : null],
+      ["Seriennummer", data.serial_number],
+      ["Firmware", data.firmware_revision],
+      ["Programmversion (Rohwert)", data.program_version],
+      ["Bestellinformation", data.order_info],
+      ["Objektname", data.object_name],
+      ["PEI-Typ", data.pei_type],
+    ].filter(([, value]) => value);
+    result.className = "device-info-content";
+    result.innerHTML = `<div class="device-info-summary"><span class="device-info-quality ${escapeHtml(data.quality)}">${escapeHtml(data.quality_label)}</span><small>Angaben stammen direkt aus den vom Gerät unterstützten KNX-Managementdiensten.</small></div><div class="device-info-grid">${fields.map(([label, value]) => `<div class="device-info-item"><small>${escapeHtml(label)}</small><strong>${escapeHtml(String(value))}</strong></div>`).join("")}</div>`;
+  } catch (error) {
+    result.className = "message error";
+    result.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Gerätedaten erneut lesen";
+  }
 });
 
 byId("project-file").addEventListener("change", (event) => {

@@ -108,6 +108,13 @@
         <p class="scan-hint">Ermittelt antwortende physikalische Adressen direkt am Bus. Kopplerfilter, RF+-Geräte ohne Versorgung und nicht erreichbare Segmente können das Ergebnis einschränken.</p>
         <div id="address-scan-progress" class="scan-progress" hidden><span></span><small>0 / 0 Adressen geprüft</small></div>
         <div id="address-scan-results" class="address-scan-results empty"><span>Noch kein Scan durchgeführt.</span></div>
+        <section id="device-info-panel" class="device-info-panel" hidden>
+          <div class="device-info-heading">
+            <div><p class="eyebrow">AUSGEWÄHLTES GERÄT</p><h3 id="device-info-address">–</h3></div>
+            <button id="read-device-info-button" class="secondary" type="button">Gerätedaten lesen</button>
+          </div>
+          <div id="device-info-result" class="device-info-empty">Adresse auswählen und Gerätedaten lesen.</div>
+        </section>
       </section>
 
       <section class="panel topology-panel">
