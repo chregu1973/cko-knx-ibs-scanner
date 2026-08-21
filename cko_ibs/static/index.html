@@ -14,9 +14,9 @@
       <div class="brand"><img class="brand-mark" src="/static/cko-toolbox-logo.png" alt="CKO" /><div><strong>KNX IBS</strong><small>Scanner</small></div></div>
       <nav>
         <button class="nav-item active">⌂ <span>Übersicht</span></button>
-        <button class="nav-item">▦ <span>Gebäude</span></button>
-        <button class="nav-item">✓ <span>Prüfungen</span></button>
-        <button class="nav-item">▤ <span>Protokoll</span></button>
+        <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▦ <span>Gebäude<small>folgt</small></span></button>
+        <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
+        <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
       </nav>
       <div class="credits">Technische Referenz<br /><a href="https://github.com/martinhoefling/SpectrumKNX" target="_blank" rel="noreferrer">SpectrumKNX ↗</a></div>
       <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
@@ -49,21 +49,28 @@
         </article>
 
         <article class="panel gateway-panel">
-          <div class="panel-heading"><div><p class="eyebrow">SCHRITT 2</p><h2>KNX/IP-Schnittstelle</h2></div><button id="scan-button" class="primary">⟳ Netzwerk scannen</button></div>
+          <div class="panel-heading"><div><p class="eyebrow">SCHRITT 2</p><h2 id="connection-heading">KNX-Schnittstelle</h2></div><button id="scan-button" class="primary">⟳ Schnittstellen suchen</button></div>
           <div class="connection-controls">
-            <label>Windows-Netzwerkadapter
+            <label id="adapter-field">Windows-Netzwerkadapter
               <select id="adapter-select"><option value="">Automatisch auswählen</option></select>
             </label>
-            <label>KNX/IP-Adresse (optional)
+            <label id="gateway-field">KNX/IP-Adresse (optional)
               <input id="gateway-ip" type="text" inputmode="decimal" placeholder="z. B. 192.168.1.20" />
             </label>
             <label>Verbindungsart
-              <select id="connection-mode"><option value="automatic">Automatisch</option><option value="udp">UDP</option><option value="udp_nat">UDP · NAT-Modus</option><option value="tcp">TCP</option><option value="tcp_secure">TCP Secure</option></select>
+              <select id="connection-mode"><option value="automatic">KNX/IP · Automatisch</option><option value="udp">KNX/IP · UDP</option><option value="udp_nat">KNX/IP · UDP/NAT</option><option value="tcp">KNX/IP · TCP</option><option value="tcp_secure">KNX/IP · TCP Secure</option><option value="usb">USB · Siemens OCI702</option></select>
             </label>
-            <label>KNX-Tunneladresse (optional)
+            <label id="individual-address-field"><span id="individual-address-label">KNX-Tunneladresse (optional)</span>
               <input id="individual-address" type="text" placeholder="z. B. 2.1.246" title="Nur eine freie, für den Tunnel vorgesehene physikalische Adresse verwenden." />
             </label>
             <button id="test-connection-button" class="secondary" type="button">Verbinden &amp; Monitor starten</button>
+          </div>
+          <div id="usb-controls" class="usb-controls" hidden>
+            <div class="usb-heading"><span>USB</span><div><strong>Siemens OCI702 direkt am KNX-Bus</strong><small>ETS muss die USB-Schnittstelle vorher freigeben.</small></div></div>
+            <label>Gefundene USB-Schnittstelle
+              <select id="usb-device-select"><option value="">Automatisch auswählen</option></select>
+            </label>
+            <p>Die physikalische Adresse wird als Quelladresse für Diagnoseabfragen verwendet und darf keinem vorhandenen Gerät entsprechen.</p>
           </div>
           <div id="tunnel-diagnostic" class="tunnel-diagnostic" hidden></div>
           <div id="secure-controls" class="secure-controls" hidden>
@@ -84,7 +91,7 @@
             </div></details>
           </div>
           <p id="connection-message" class="message"></p>
-          <div id="gateway-list" class="empty-state"><span>⌁</span><strong>Noch keine Suche durchgeführt</strong><small>Die Suche verwendet KNXnet/IP Discovery im lokalen Netzwerk.</small></div>
+          <div id="gateway-list" class="empty-state"><span>⌁</span><strong>Noch keine Suche durchgeführt</strong><small>KNX/IP wird im Netzwerk gesucht; USB-Schnittstellen werden lokal erkannt.</small></div>
         </article>
       </section>
 

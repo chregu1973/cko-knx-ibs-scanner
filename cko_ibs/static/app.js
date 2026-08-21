@@ -23,9 +23,21 @@ async function loadAdapters() {
 
 loadAdapters();
 
-byId("connection-mode").addEventListener("change", () => {
-  byId("secure-controls").hidden = byId("connection-mode").value !== "tcp_secure";
-});
+function updateConnectionMode() {
+  const mode = byId("connection-mode").value;
+  const usb = mode === "usb";
+  byId("secure-controls").hidden = mode !== "tcp_secure";
+  byId("usb-controls").hidden = !usb;
+  byId("adapter-field").hidden = usb;
+  byId("gateway-field").hidden = usb;
+  byId("scan-button").textContent = usb ? "⟳ USB suchen" : "⟳ Netzwerk scannen";
+  byId("individual-address-label").textContent = usb
+    ? "KNX-Quelladresse (empfohlen)"
+    : "KNX-Tunneladresse (optional)";
+}
+
+byId("connection-mode").addEventListener("change", updateConnectionMode);
+updateConnectionMode();
 
 byId("keyring-file").addEventListener("change", (event) => {
   byId("keyring-file-label").textContent = event.target.files[0]?.name || ".knxkeys auswählen";
@@ -34,11 +46,35 @@ byId("keyring-file").addEventListener("change", (event) => {
 byId("scan-button").addEventListener("click", async () => {
   const button = byId("scan-button");
   const list = byId("gateway-list");
+  const usbMode = byId("connection-mode").value === "usb";
   button.disabled = true;
   button.textContent = "Suche läuft …";
   list.className = "empty-state";
-  list.innerHTML = "<span>◌</span><strong>KNX/IP-Netzwerk wird durchsucht</strong><small>Dies dauert ungefähr drei Sekunden.</small>";
+  list.innerHTML = usbMode
+    ? "<span>USB</span><strong>Lokale USB-Schnittstellen werden gesucht</strong>"
+    : "<span>◌</span><strong>KNX/IP-Netzwerk wird durchsucht</strong><small>Dies dauert ungefähr drei Sekunden.</small>";
   try {
+    if (usbMode) {
+      const response = await fetch("/api/knx/usb-devices");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "USB-Suche fehlgeschlagen");
+      const select = byId("usb-device-select");
+      select.innerHTML = '<option value="">Automatisch auswählen</option>';
+      data.devices.forEach((device) => {
+        const option = document.createElement("option");
+        option.value = device.id;
+        option.textContent = `${device.name}${device.serial_number ? ` · ${device.serial_number}` : ""}`;
+        select.appendChild(option);
+      });
+      if (!data.devices.length) {
+        list.innerHTML = "<span>USB</span><strong>Keine Siemens OCI702 gefunden</strong><small>USB anschließen und die ETS-Verbindung trennen.</small>";
+      } else {
+        select.value = data.devices[0].id;
+        list.className = "";
+        list.innerHTML = data.devices.map((device) => `<div class="gateway usb-device"><div><strong>${escapeHtml(device.name)}</strong><small>VID ${device.vendor_id} · PID ${device.product_id}${device.serial_number ? ` · ${escapeHtml(device.serial_number)}` : ""}</small></div><div class="gateway-tags"><span>USB</span><span>cEMI</span></div></div>`).join("");
+      }
+      return;
+    }
     const localIp = byId("adapter-select").value;
     const query = localIp ? `?local_ip=${encodeURIComponent(localIp)}` : "";
     const response = await fetch(`/api/knx/gateways${query}`);
@@ -60,7 +96,7 @@ byId("scan-button").addEventListener("click", async () => {
     list.innerHTML = `<span>!</span><strong>Suche fehlgeschlagen</strong><small>${escapeHtml(error.message)}</small>`;
   } finally {
     button.disabled = false;
-    button.textContent = "⟳ Netzwerk scannen";
+    button.textContent = usbMode ? "⟳ USB suchen" : "⟳ Netzwerk scannen";
   }
 });
 
@@ -69,7 +105,8 @@ byId("test-connection-button").addEventListener("click", async () => {
   const message = byId("connection-message");
   const gatewayIp = byId("gateway-ip").value.trim();
   const individualAddress = byId("individual-address").value.trim();
-  if (!gatewayIp) {
+  const mode = byId("connection-mode").value;
+  if (mode !== "usb" && !gatewayIp) {
     message.className = "message error";
     message.textContent = "Bitte zuerst die IP-Adresse der KNX/IP-Schnittstelle eingeben.";
     return;
@@ -81,11 +118,16 @@ byId("test-connection-button").addEventListener("click", async () => {
   }
   button.disabled = true;
   message.className = "message";
-  message.textContent = `Verbindung zu ${gatewayIp} wird geprüft …`;
+  message.textContent = mode === "usb" ? "Siemens OCI702 wird geöffnet …" : `Verbindung zu ${gatewayIp} wird geprüft …`;
   try {
-    const mode = byId("connection-mode").value;
     let response;
-    if (mode === "tcp_secure") {
+    if (mode === "usb") {
+      response = await fetch("/api/knx/connect-usb", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({device_id: byId("usb-device-select").value || null, individual_address: individualAddress || null}),
+      });
+    } else if (mode === "tcp_secure") {
       const secureForm = new FormData();
       secureForm.append("gateway_ip", gatewayIp);
       if (byId("adapter-select").value) secureForm.append("local_ip", byId("adapter-select").value);
@@ -107,7 +149,7 @@ byId("test-connection-button").addEventListener("click", async () => {
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Verbindung fehlgeschlagen");
     message.className = "message success";
-    message.textContent = `${data.message} Quelladresse: ${data.individual_address || "nicht ermittelt"}.`;
+    message.textContent = `${data.message} Quelladresse: ${data.individual_address || "nicht festgelegt"}.`;
     byId("connection-badge").className = "badge good";
     byId("connection-badge").textContent = `✓ ${data.connection_mode} · KNX ${data.individual_address || "?"}`;
     const diagnostic = byId("tunnel-diagnostic");
@@ -115,7 +157,9 @@ byId("test-connection-button").addEventListener("click", async () => {
     diagnostic.className = `tunnel-diagnostic${data.address_warning ? " warning" : ""}`;
     diagnostic.innerHTML = data.address_warning
       ? `<strong>⚠ Tunneladress-Warnung:</strong> ${escapeHtml(data.address_warning)}`
-      : `<strong>✓ Aktive KNX-Quelladresse: ${escapeHtml(data.individual_address || "nicht ermittelt")}</strong><br>Diese Adresse wurde vom KNX/IP-Tunnel bestätigt. Für parallele Verbindungen muss jede Tunneladresse eindeutig sein.`;
+      : mode === "usb"
+        ? `<strong>✓ ${escapeHtml(data.usb_device?.name || "KNX USB")} aktiv</strong><br>KNX-Quelladresse: ${escapeHtml(data.individual_address || "0.0.0")}. Für linienübergreifende Prüfungen eine freie Adresse aus der passenden Topologie verwenden.`
+        : `<strong>✓ Aktive KNX-Quelladresse: ${escapeHtml(data.individual_address || "nicht ermittelt")}</strong><br>Diese Adresse wurde vom KNX/IP-Tunnel bestätigt. Für parallele Verbindungen muss jede Tunneladresse eindeutig sein.`;
     byId("device-scan-button").disabled = projectDevices.length === 0;
     startMonitor();
   } catch (error) {

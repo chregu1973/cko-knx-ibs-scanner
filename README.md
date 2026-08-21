@@ -1,7 +1,20 @@
 # CKO KNX IBS Scanner
 
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
-KNX/IP-Diagnose und Abschlussprotokolle.
+KNX/IP- und KNX-USB-Diagnose.
+
+## Version 0.4.0
+
+- Direkte KNX-USB-Verbindung über USB-HID/cEMI
+- Siemens OCI702 USB als erstes Referenzmodell
+- lokale USB-Erkennung mit Gerätekennung und Seriennummer
+- Telegrammmonitor und Geräteprüfung über dieselbe USB-Verbindung
+- wählbare physikalische Quelladresse für linienübergreifende Diagnose
+- noch nicht implementierte Sidebar-Bereiche sind als „folgt“ deaktiviert
+
+Vor dem Öffnen der OCI702 muss die ETS-Verbindung zur USB-Schnittstelle getrennt werden.
+Eine USB-Schnittstelle kann normalerweise nicht gleichzeitig von ETS und dem IBS Scanner
+verwendet werden.
 
 ## Stand v0.1
 

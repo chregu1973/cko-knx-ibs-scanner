@@ -50,6 +50,31 @@
   color: #ffffff;
 }
 
+.nav-item.planned {
+  opacity: .42;
+  cursor: not-allowed;
+  filter: saturate(.45);
+}
+
+.nav-item.planned span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;
+}
+
+.nav-item.planned small {
+  padding: 2px 6px;
+  border: 1px solid #405168;
+  border-radius: 10px;
+  color: #7890aa;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
 .nav-item.active {
   border-color: #1979c8;
   background: linear-gradient(90deg, #0b3b70 0%, #10263e 72%, #101b2a 100%);

@@ -15,6 +15,8 @@ from xknx.management.procedures import nm_individual_address_check
 from xknx.telegram import Telegram
 from xknx.telegram.address import IndividualAddress
 
+from cko_ibs.usb_connection import KNXUSBInterface, find_usb_device
+
 
 def connection_attempts(mode: str) -> list[tuple[str, ConnectionType, bool]]:
     """Return connection attempts in the requested order."""
@@ -39,6 +41,7 @@ class BusConnection:
         self.local_ip: str | None = None
         self.connection_mode: str | None = None
         self.requested_individual_address: str | None = None
+        self.usb_device: dict[str, Any] | None = None
         self._subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
         self._group_addresses: dict[str, dict[str, str | None]] = {}
         self._lock = asyncio.Lock()
@@ -93,6 +96,33 @@ class BusConnection:
                     f"KNX/IP-Tunnel über {label} dauerhaft aufgebaut. Busmonitor ist aktiv."
                 )
             raise RuntimeError("Kein Verbindungsmodus erfolgreich. " + " | ".join(errors))
+
+    async def connect_usb(
+        self, device_id: str | None = None, individual_address: str | None = None
+    ) -> dict[str, Any]:
+        """Connect directly to a Siemens OCI702 KNX USB HID interface."""
+        requested_address = self._validate_individual_address(individual_address)
+        device = find_usb_device(device_id)
+        async with self._lock:
+            await self._disconnect_unlocked()
+            candidate = XKNX(telegram_received_cb=self._on_telegram)
+            candidate.knxip_interface = KNXUSBInterface(candidate, device)
+            if requested_address:
+                candidate.current_address = IndividualAddress(requested_address)
+            try:
+                async with asyncio.timeout(8):
+                    await candidate.start()
+            except Exception:
+                with suppress(Exception):
+                    async with asyncio.timeout(2):
+                        await candidate.stop()
+                raise
+            self.xknx = candidate
+            self.connection_mode = "USB · Siemens OCI702"
+            self.requested_individual_address = requested_address
+            self.usb_device = device.to_dict()
+            self._apply_group_address_dpts()
+        return self.status("Siemens OCI702 USB verbunden. Busmonitor ist aktiv.")
 
     async def disconnect(self) -> dict[str, Any]:
         async with self._lock:
@@ -172,6 +202,7 @@ class BusConnection:
         self.local_ip = None
         self.connection_mode = None
         self.requested_individual_address = None
+        self.usb_device = None
 
     @staticmethod
     def _validate_individual_address(address: str | None) -> str | None:
@@ -218,6 +249,7 @@ class BusConnection:
             "connection_mode": self.connection_mode,
             "individual_address": current_address,
             "requested_individual_address": self.requested_individual_address,
+            "usb_device": self.usb_device,
             "address_warning": address_warning,
             "message": message,
         }

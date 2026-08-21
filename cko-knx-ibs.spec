@@ -18,6 +18,7 @@ a = Analysis(
         "uvicorn.protocols.websockets.auto",
         "uvicorn.lifespan.on",
         "xknxproject",
+        "hid",
         "webview",
         "webview.platforms.edgechromium",
         "clr",

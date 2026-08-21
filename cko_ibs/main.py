@@ -17,6 +17,7 @@ from cko_ibs import __version__
 from cko_ibs.bus_connection import bus_connection
 from cko_ibs.knx_discovery import discover_gateways, network_adapters
 from cko_ibs.project_reader import read_project
+from cko_ibs.usb_connection import discover_usb_devices
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = PACKAGE_DIR / "static"
@@ -46,6 +47,11 @@ class ConnectionTestRequest(BaseModel):
 
 class DeviceCheckRequest(BaseModel):
     address: str
+
+
+class USBConnectionRequest(BaseModel):
+    device_id: str | None = None
+    individual_address: str | None = None
 
 
 @app.get("/api/health")
@@ -160,6 +166,31 @@ async def connect_secure(
 @app.get("/api/knx/status")
 async def connection_status() -> dict:
     return bus_connection.status()
+
+
+@app.get("/api/knx/usb-devices")
+async def usb_devices() -> dict:
+    try:
+        devices = [device.to_dict() for device in discover_usb_devices()]
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"USB-Suche fehlgeschlagen: {exc}") from exc
+    return {"devices": devices, "count": len(devices)}
+
+
+@app.post("/api/knx/connect-usb")
+async def connect_usb(request: USBConnectionRequest) -> dict:
+    try:
+        return await bus_connection.connect_usb(request.device_id, request.individual_address)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "KNX-USB-Verbindung fehlgeschlagen. ETS vollständig vom USB-Interface trennen. "
+                f"Details: {exc}"
+            ),
+        ) from exc
 
 
 @app.post("/api/knx/disconnect")
