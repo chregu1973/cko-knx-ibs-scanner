@@ -137,19 +137,21 @@
         </header>
         <section class="panel monitor-panel monitor-workspace">
           <div class="monitor-toolbar">
-            <label class="monitor-search">Gruppenadresse oder Bezeichnung
-              <input id="monitor-search" type="search" placeholder="z. B. 4/1/26 oder Licht Büro" autocomplete="off" />
-            </label>
-            <label>Quelle
-              <input id="monitor-source-filter" type="search" placeholder="z. B. 1.1.109" autocomplete="off" />
-            </label>
-            <label>Dienst
-              <select id="monitor-service-filter"><option value="">Alle Dienste</option><option value="GroupValueWrite">Schreiben</option><option value="GroupValueRead">Lesen</option><option value="GroupValueResponse">Antwort</option></select>
-            </label>
-            <label class="monitor-secure-filter"><input id="monitor-secure-only" type="checkbox" /> Nur Secure</label>
-            <div class="monitor-actions">
+            <div class="monitor-action-row">
               <button id="monitor-toggle-button" class="primary" type="button">Monitor starten</button>
               <button id="clear-monitor-button" class="secondary" type="button">Anzeige leeren</button>
+            </div>
+            <div class="monitor-filter-row">
+              <label class="monitor-search">Gruppenadresse oder Bezeichnung
+                <input id="monitor-search" type="search" placeholder="z. B. 4/1/26 oder Licht Büro" autocomplete="off" />
+              </label>
+              <label>Quelle
+                <input id="monitor-source-filter" type="search" placeholder="z. B. 1.1.109" autocomplete="off" />
+              </label>
+              <label>Dienst
+                <select id="monitor-service-filter"><option value="">Alle Dienste</option><option value="GroupValueWrite">Schreiben</option><option value="GroupValueRead">Lesen</option><option value="GroupValueResponse">Antwort</option></select>
+              </label>
+              <label class="monitor-secure-filter"><input id="monitor-secure-only" type="checkbox" /> Nur Secure</label>
             </div>
           </div>
           <div class="monitor-summary"><strong id="monitor-visible-count">0</strong><span>angezeigt</span><i></i><strong id="monitor-total-count">0</strong><span>aufgezeichnet</span><small id="monitor-filter-note">Keine Filter aktiv</small></div>
