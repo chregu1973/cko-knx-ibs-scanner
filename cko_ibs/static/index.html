@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>CKO KNX IBS Scanner</title>
+    <link rel="icon" href="/static/cko-toolbox-logo.png" />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/connection.css" />
+    <link rel="stylesheet" href="/static/branding.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand"><img class="brand-mark" src="/static/cko-toolbox-logo.png" alt="CKO" /><div><strong>KNX IBS</strong><small>Scanner</small></div></div>
+      <nav>
+        <button id="overview-nav" class="nav-item active" type="button" data-view="overview">⌂ <span>Übersicht</span></button>
+        <button id="monitor-nav" class="nav-item" type="button" data-view="monitor">↯ <span>Gruppenmonitor</span></button>
+        <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▦ <span>Gebäude<small>folgt</small></span></button>
+        <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
+        <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
+      </nav>
+      <div class="credits">Technische Referenz<br /><a href="https://github.com/martinhoefling/SpectrumKNX" target="_blank" rel="noreferrer">SpectrumKNX ↗</a></div>
+      <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
+      <a class="return-button" href="https://toolbox.ckoeppen.ch/">← Zurück zur Toolbox</a>
+    </aside>
+
+    <main>
+      <div id="overview-view" class="app-view">
+      <header>
+        <div><p class="eyebrow">LOKALE WINDOWS-ANWENDUNG</p><h1 id="project-name">KNX IBS Scanner</h1></div>
+        <div class="header-actions"><span id="project-badge" class="badge muted">○ Kein ETS-Projekt</span><span id="connection-badge" class="badge muted">○ Nicht verbunden</span></div>
+      </header>
+
+      <section class="stats">
+        <article><span class="stat-icon blue">▣</span><div><strong id="device-count">0</strong><p>Geräte</p></div></article>
+        <article><span class="stat-icon green">✓</span><div><strong>0</strong><p>OK</p></div></article>
+        <article><span class="stat-icon red">×</span><div><strong>0</strong><p>Fehler</p></div></article>
+        <article><span class="stat-icon orange">!</span><div><strong id="open-count">0</strong><p>offen</p></div></article>
+      </section>
+
+      <section class="workspace-grid">
+        <article class="panel import-panel">
+          <div class="panel-heading"><div><p class="eyebrow">SCHRITT 1</p><h2>ETS-Projekt laden</h2></div><span class="privacy">Nur lokal verarbeitet</span></div>
+          <form id="project-form">
+            <label class="dropzone" for="project-file"><span>⇧</span><strong>.knxproj auswählen</strong><small>ETS 4, ETS 5 oder ETS 6 · maximal 250 MB</small></label>
+            <input id="project-file" name="project" type="file" accept=".knxproj" required />
+            <input id="project-password" name="password" type="password" placeholder="Projektpasswort (optional)" />
+            <button class="primary" type="submit">Projekt analysieren</button>
+          </form>
+          <p id="project-message" class="message"></p>
+        </article>
+
+        <article class="panel gateway-panel">
+          <div class="panel-heading"><div><p class="eyebrow">SCHRITT 2</p><h2 id="connection-heading">KNX-Schnittstelle</h2></div><button id="scan-button" class="primary">⟳ Schnittstellen suchen</button></div>
+          <div class="connection-controls">
+            <label id="adapter-field">Windows-Netzwerkadapter
+              <select id="adapter-select"><option value="">Automatisch auswählen</option></select>
+            </label>
+            <label id="gateway-field">KNX/IP-Adresse (optional)
+              <input id="gateway-ip" type="text" inputmode="decimal" placeholder="z. B. 192.168.1.20" />
+            </label>
+            <label>Verbindungsart
+              <select id="connection-mode"><option value="automatic">KNX/IP · Automatisch</option><option value="udp">KNX/IP · UDP</option><option value="udp_nat">KNX/IP · UDP/NAT</option><option value="tcp">KNX/IP · TCP</option><option value="tcp_secure">KNX/IP · TCP Secure</option><option value="usb">USB · Siemens OCI702</option></select>
+            </label>
+            <label id="individual-address-field"><span id="individual-address-label">KNX-Tunneladresse (optional)</span>
+              <input id="individual-address" type="text" placeholder="z. B. 2.1.246" title="Nur eine freie, für den Tunnel vorgesehene physikalische Adresse verwenden." />
+            </label>
+            <button id="test-connection-button" class="secondary" type="button">Verbinden &amp; Monitor starten</button>
+            <button id="disconnect-button" class="disconnect-button" type="button" hidden>Verbindung trennen</button>
+          </div>
+          <div id="usb-controls" class="usb-controls" hidden>
+            <div class="usb-heading"><span>USB</span><div><strong>Siemens OCI702 direkt am KNX-Bus</strong><small>ETS muss die USB-Schnittstelle vorher freigeben.</small></div></div>
+            <label>Gefundene USB-Schnittstelle
+              <select id="usb-device-select"><option value="">Automatisch auswählen</option></select>
+            </label>
+            <p class="usb-required">⚠ Bei USB ist eine freie physikalische Quelladresse zwingend. Ohne Eingabe würde 0.0.0 verwendet; damit funktionieren linienübergreifende Diagnoseabfragen nicht.</p>
+          </div>
+          <div id="tunnel-diagnostic" class="tunnel-diagnostic" hidden></div>
+          <div id="secure-controls" class="secure-controls" hidden>
+            <div class="secure-heading"><span>♢</span><div><strong>KNX IP Secure</strong><small>Schlüssel werden nur lokal im Arbeitsspeicher verwendet.</small></div></div>
+            <div class="secure-grid">
+              <label class="secure-file">ETS Keyring
+                <span id="keyring-file-label">.knxkeys auswählen</span>
+                <input id="keyring-file" type="file" accept=".knxkeys" />
+              </label>
+              <label>Keyring-/Inbetriebnahmepasswort
+                <input id="keyring-password" type="password" autocomplete="off" placeholder="Passwort der .knxkeys" />
+              </label>
+            </div>
+            <details class="manual-secure"><summary>Secure-Daten alternativ manuell eingeben</summary><div class="secure-grid manual-grid">
+              <label>Benutzer-ID<input id="secure-user-id" type="number" min="1" max="127" placeholder="z. B. 2" /></label>
+              <label>Secure-Benutzerpasswort<input id="secure-user-password" type="password" autocomplete="off" /></label>
+              <label>Authentifizierungscode (optional)<input id="secure-auth-code" type="password" autocomplete="off" /></label>
+            </div></details>
+          </div>
+          <p id="connection-message" class="message"></p>
+          <div id="gateway-list" class="empty-state"><span>⌁</span><strong>Noch keine Suche durchgeführt</strong><small>KNX/IP wird im Netzwerk gesucht; USB-Schnittstellen werden lokal erkannt.</small></div>
+        </article>
+      </section>
+
+      <section class="panel address-scan-panel">
+        <div class="panel-heading"><div><p class="eyebrow">OHNE ETS-PROJEKT NUTZBAR</p><h2>Physikalische Adressen suchen</h2></div><span class="badge info">KNX-Linienscan</span></div>
+        <div class="address-scan-controls">
+          <label>Bereich<input id="scan-area" type="number" min="0" max="15" value="1" /></label>
+          <label>Linie<input id="scan-line" type="number" min="0" max="15" value="1" /></label>
+          <label>Von Gerät<input id="scan-device-from" type="number" min="1" max="255" value="1" /></label>
+          <label>Bis Gerät<input id="scan-device-to" type="number" min="1" max="255" value="255" /></label>
+          <button id="address-scan-button" class="primary" type="button">Linie scannen</button>
+        </div>
+        <p class="scan-hint">Ermittelt antwortende physikalische Adressen direkt am Bus. Kopplerfilter, RF+-Geräte ohne Versorgung und nicht erreichbare Segmente können das Ergebnis einschränken.</p>
+        <div id="address-scan-progress" class="scan-progress" hidden><span></span><small>0 / 0 Adressen geprüft</small></div>
+        <div id="address-scan-results" class="address-scan-results empty"><span>Noch kein Scan durchgeführt.</span></div>
+        <section id="device-info-panel" class="device-info-panel" hidden>
+          <div class="device-info-heading">
+            <div><p class="eyebrow">AUSGEWÄHLTES GERÄT</p><h3 id="device-info-address">–</h3></div>
+            <button id="read-device-info-button" class="secondary" type="button">Gerätedaten lesen</button>
+          </div>
+          <div id="device-info-result" class="device-info-empty">Adresse auswählen und Gerätedaten lesen.</div>
+        </section>
+      </section>
+
+      <section class="panel topology-panel">
+        <div class="panel-heading"><div><p class="eyebrow">PROJEKTÜBERSICHT</p><h2>KNX-Topologie</h2></div><div class="topology-actions"><span class="legend"><i class="dot gray"></i> ungeprüft <i class="dot green"></i> OK <i class="dot blue-dot"></i> Info <i class="dot orange"></i> Warnung <i class="dot red"></i> Fehler</span><button id="device-scan-button" class="primary" type="button" disabled>Geräte prüfen</button></div></div>
+        <div id="scan-progress" class="scan-progress" hidden><span></span><small>0 / 0 Geräte geprüft</small></div>
+        <div id="topology" class="topology-empty"><span>◇</span><strong>Projekt laden, um Bereiche, Linien und Geräte darzustellen</strong></div>
+        <section id="open-points" class="open-points" hidden>
+          <div class="open-points-heading"><h3>Offene Punkte</h3><span id="open-points-count">0</span></div>
+          <div id="open-points-list"></div>
+        </section>
+      </section>
+      </div>
+
+      <div id="monitor-view" class="app-view" hidden>
+        <header class="monitor-page-header">
+          <div><p class="eyebrow">LIVE · NUR LESEN</p><h1>KNX-Gruppenmonitor</h1><p class="page-lead">Telegramme live beobachten, anhalten und gezielt nach Gruppenadressen oder Projektbezeichnungen durchsuchen.</p></div>
+          <div class="header-actions"><span id="monitor-connection-badge" class="badge muted">○ Nicht verbunden</span><span id="monitor-state" class="badge muted">○ Monitor wartet</span></div>
+        </header>
+        <section class="panel monitor-panel monitor-workspace">
+          <div class="monitor-toolbar">
+            <label class="monitor-search">Gruppenadresse oder Bezeichnung
+              <input id="monitor-search" type="search" placeholder="z. B. 4/1/26 oder Licht Büro" autocomplete="off" />
+            </label>
+            <label>Quelle
+              <input id="monitor-source-filter" type="search" placeholder="z. B. 1.1.109" autocomplete="off" />
+            </label>
+            <label>Dienst
+              <select id="monitor-service-filter"><option value="">Alle Dienste</option><option value="GroupValueWrite">Schreiben</option><option value="GroupValueRead">Lesen</option><option value="GroupValueResponse">Antwort</option></select>
+            </label>
+            <label class="monitor-secure-filter"><input id="monitor-secure-only" type="checkbox" /> Nur Secure</label>
+            <div class="monitor-actions">
+              <button id="monitor-toggle-button" class="primary" type="button">Monitor starten</button>
+              <button id="clear-monitor-button" class="secondary" type="button">Anzeige leeren</button>
+            </div>
+          </div>
+          <div class="monitor-summary"><strong id="monitor-visible-count">0</strong><span>angezeigt</span><i></i><strong id="monitor-total-count">0</strong><span>aufgezeichnet</span><small id="monitor-filter-note">Keine Filter aktiv</small></div>
+          <div class="monitor-table-wrap"><table class="monitor-table"><thead><tr><th>Zeit</th><th>Von</th><th>Gruppenadresse / Bezeichnung</th><th>DPT</th><th>Dienst</th><th>Wert</th><th>Rohdaten</th></tr></thead><tbody id="monitor-body"><tr class="monitor-empty"><td colspan="7">KNX-Verbindung aufbauen und anschließend den Monitor starten.</td></tr></tbody></table></div>
+        </section>
+      </div>
+    </main>
+    <dialog id="shutdown-dialog" class="shutdown-dialog">
+      <form method="dialog">
+        <span class="shutdown-icon">⏻</span>
+        <h2>Anwendung wirklich beenden?</h2>
+        <p>Die aktive KNX/IP-Verbindung wird sauber getrennt und der lokale Windows-Server beendet.</p>
+        <div class="dialog-actions">
+          <button class="secondary" value="cancel">Abbrechen</button>
+          <button id="confirm-shutdown-button" class="danger" value="confirm">KNX trennen &amp; beenden</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

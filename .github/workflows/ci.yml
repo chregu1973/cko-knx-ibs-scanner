@@ -1,0 +1,49 @@
+name: Test and build
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .[dev]
+      - run: ruff check .
+      - run: pytest -q
+
+  windows:
+    runs-on: windows-latest
+    env:
+      CKO_SIGNING_CERTIFICATE_BASE64: ${{ secrets.CKO_SIGNING_CERTIFICATE_BASE64 }}
+      CKO_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.CKO_SIGNING_CERTIFICATE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .[dev]
+      - run: pyinstaller --noconfirm cko-knx-ibs.spec
+      - name: Sign application when certificate is configured
+        if: env.CKO_SIGNING_CERTIFICATE_BASE64 != ''
+        shell: pwsh
+        run: ./scripts/sign-windows.ps1 -FilePath "dist/CKO-KNX-IBS/CKO-KNX-IBS.exe"
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "installer\cko-knx-ibs.iss"
+      - name: Sign installer when certificate is configured
+        if: env.CKO_SIGNING_CERTIFICATE_BASE64 != ''
+        shell: pwsh
+        run: ./scripts/sign-windows.ps1 -FilePath "dist-installer/CKO-KNX-IBS-Scanner-Setup.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cko-knx-ibs-windows-installer
+          path: dist-installer/CKO-KNX-IBS-Scanner-Setup.exe
