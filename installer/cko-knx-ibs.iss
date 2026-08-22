@@ -1,5 +1,5 @@
 #define AppName "CKO KNX IBS Scanner"
-#define AppVersion "0.6.0"
+#define AppVersion "0.7.0"
 #define AppPublisher "CKO Toolbox"
 #define AppExeName "CKO-KNX-IBS.exe"
 

@@ -3,9 +3,13 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
-## Version 0.6.0
+## Version 0.7.0
 
-Neu: Nach einem physikalischen Adressscan kann eine gefundene Adresse ausgewählt
+Neu: Der KNX-Gruppenmonitor hat eine eigene, übersichtliche Seite. Die Aufzeichnung
+kann ohne Trennung der KNX-Verbindung gestoppt und anschließend nach Gruppenadresse,
+GA-Bezeichnung, Quelle, Dienst oder Secure-Telegrammen gefiltert werden.
+
+Nach einem physikalischen Adressscan kann eine gefundene Adresse ausgewählt
 und über **Gerätedaten lesen** abgefragt werden. Das Tool liest – soweit vom Gerät
 unterstützt – Maskenversion, Herstellerkennung, Seriennummer, Firmware,
 Programmversion, Bestellinformation, Objektname und PEI-Typ. Nicht jedes KNX-Gerät
@@ -15,7 +19,7 @@ werden deshalb nicht als Gerätefehler bewertet.
 - Direkte KNX-USB-Verbindung über USB-HID/cEMI
 - Siemens OCI702 USB als erstes Referenzmodell
 - lokale USB-Erkennung mit Gerätekennung und Seriennummer
-- Telegrammmonitor und Geräteprüfung über dieselbe USB-Verbindung
+- Gruppenmonitor und Geräteprüfung über dieselbe USB-Verbindung
 - wählbare physikalische Quelladresse für linienübergreifende Diagnose
 - noch nicht implementierte Sidebar-Bereiche sind als „folgt“ deaktiviert
 - USB-Verbindungen erfordern zwingend eine freie physikalische Quelladresse

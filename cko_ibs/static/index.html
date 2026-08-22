@@ -13,7 +13,8 @@
     <aside class="sidebar">
       <div class="brand"><img class="brand-mark" src="/static/cko-toolbox-logo.png" alt="CKO" /><div><strong>KNX IBS</strong><small>Scanner</small></div></div>
       <nav>
-        <button class="nav-item active">⌂ <span>Übersicht</span></button>
+        <button id="overview-nav" class="nav-item active" type="button" data-view="overview">⌂ <span>Übersicht</span></button>
+        <button id="monitor-nav" class="nav-item" type="button" data-view="monitor">↯ <span>Gruppenmonitor</span></button>
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▦ <span>Gebäude<small>folgt</small></span></button>
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
@@ -24,6 +25,7 @@
     </aside>
 
     <main>
+      <div id="overview-view" class="app-view">
       <header>
         <div><p class="eyebrow">LOKALE WINDOWS-ANWENDUNG</p><h1 id="project-name">KNX IBS Scanner</h1></div>
         <div class="header-actions"><span id="project-badge" class="badge muted">○ Kein ETS-Projekt</span><span id="connection-badge" class="badge muted">○ Nicht verbunden</span></div>
@@ -126,11 +128,34 @@
           <div id="open-points-list"></div>
         </section>
       </section>
+      </div>
 
-      <section class="panel monitor-panel">
-        <div class="panel-heading"><div><p class="eyebrow">LIVE · NUR LESEN</p><h2>KNX-Telegrammmonitor</h2></div><div class="monitor-actions"><span id="monitor-state" class="badge muted">○ Monitor wartet</span><button id="clear-monitor-button" class="secondary" type="button">Anzeige leeren</button></div></div>
-        <div class="monitor-table-wrap"><table class="monitor-table"><thead><tr><th>Zeit</th><th>Von</th><th>Gruppenadresse / Bezeichnung</th><th>DPT</th><th>Dienst</th><th>Wert</th><th>Rohdaten</th></tr></thead><tbody id="monitor-body"><tr class="monitor-empty"><td colspan="7">Nach dem Verbindungsaufbau werden aktuelle KNX-Telegramme hier angezeigt.</td></tr></tbody></table></div>
-      </section>
+      <div id="monitor-view" class="app-view" hidden>
+        <header class="monitor-page-header">
+          <div><p class="eyebrow">LIVE · NUR LESEN</p><h1>KNX-Gruppenmonitor</h1><p class="page-lead">Telegramme live beobachten, anhalten und gezielt nach Gruppenadressen oder Projektbezeichnungen durchsuchen.</p></div>
+          <div class="header-actions"><span id="monitor-connection-badge" class="badge muted">○ Nicht verbunden</span><span id="monitor-state" class="badge muted">○ Monitor wartet</span></div>
+        </header>
+        <section class="panel monitor-panel monitor-workspace">
+          <div class="monitor-toolbar">
+            <label class="monitor-search">Gruppenadresse oder Bezeichnung
+              <input id="monitor-search" type="search" placeholder="z. B. 4/1/26 oder Licht Büro" autocomplete="off" />
+            </label>
+            <label>Quelle
+              <input id="monitor-source-filter" type="search" placeholder="z. B. 1.1.109" autocomplete="off" />
+            </label>
+            <label>Dienst
+              <select id="monitor-service-filter"><option value="">Alle Dienste</option><option value="GroupValueWrite">Schreiben</option><option value="GroupValueRead">Lesen</option><option value="GroupValueResponse">Antwort</option></select>
+            </label>
+            <label class="monitor-secure-filter"><input id="monitor-secure-only" type="checkbox" /> Nur Secure</label>
+            <div class="monitor-actions">
+              <button id="monitor-toggle-button" class="primary" type="button">Monitor starten</button>
+              <button id="clear-monitor-button" class="secondary" type="button">Anzeige leeren</button>
+            </div>
+          </div>
+          <div class="monitor-summary"><strong id="monitor-visible-count">0</strong><span>angezeigt</span><i></i><strong id="monitor-total-count">0</strong><span>aufgezeichnet</span><small id="monitor-filter-note">Keine Filter aktiv</small></div>
+          <div class="monitor-table-wrap"><table class="monitor-table"><thead><tr><th>Zeit</th><th>Von</th><th>Gruppenadresse / Bezeichnung</th><th>DPT</th><th>Dienst</th><th>Wert</th><th>Rohdaten</th></tr></thead><tbody id="monitor-body"><tr class="monitor-empty"><td colspan="7">KNX-Verbindung aufbauen und anschließend den Monitor starten.</td></tr></tbody></table></div>
+        </section>
+      </div>
     </main>
     <dialog id="shutdown-dialog" class="shutdown-dialog">
       <form method="dialog">

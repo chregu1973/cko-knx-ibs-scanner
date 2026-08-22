@@ -5,6 +5,22 @@ let topologyFlowResizeBound = false;
 let cancelAddressScan = false;
 let busConnected = false;
 let selectedScanAddress = null;
+let monitorTelegrams = [];
+let monitorRunning = false;
+
+function showView(view) {
+  document.querySelectorAll(".app-view").forEach((element) => {
+    element.hidden = element.id !== `${view}-view`;
+  });
+  document.querySelectorAll(".nav-item[data-view]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === view);
+  });
+  if (view === "monitor") renderMonitor();
+}
+
+document.querySelectorAll(".nav-item[data-view]").forEach((button) => {
+  button.addEventListener("click", () => showView(button.dataset.view));
+});
 
 function addressCards(found) {
   return found
@@ -35,12 +51,6 @@ loadAdapters();
 
 function updateConnectionMode() {
   const mode = byId("connection-mode").value;
-  if (mode === "usb" && !individualAddress) {
-    message.className = "message error";
-    message.textContent = "Für KNX USB muss zwingend eine freie physikalische Quelladresse eingetragen werden.";
-    byId("individual-address").focus();
-    return;
-  }
   const usb = mode === "usb";
   byId("secure-controls").hidden = mode !== "tcp_secure";
   byId("usb-controls").hidden = !usb;
@@ -178,6 +188,7 @@ byId("test-connection-button").addEventListener("click", async () => {
         : `<strong>✓ Aktive KNX-Quelladresse: ${escapeHtml(data.individual_address || "nicht ermittelt")}</strong><br>Diese Adresse wurde vom KNX/IP-Tunnel bestätigt. Für parallele Verbindungen muss jede Tunneladresse eindeutig sein.`;
     byId("device-scan-button").disabled = projectDevices.length === 0;
     busConnected = true;
+    updateMonitorConnectionBadge();
     byId("disconnect-button").hidden = false;
     startMonitor();
   } catch (error) {
@@ -187,6 +198,7 @@ byId("test-connection-button").addEventListener("click", async () => {
     byId("connection-badge").textContent = "○ Nicht verbunden";
     byId("tunnel-diagnostic").hidden = true;
     busConnected = false;
+    updateMonitorConnectionBadge();
     byId("disconnect-button").hidden = true;
   } finally {
     button.disabled = false;
@@ -207,6 +219,7 @@ byId("disconnect-button").addEventListener("click", async () => {
       monitorSocket = null;
     }
     busConnected = false;
+    updateMonitorConnectionBadge();
     byId("connection-badge").className = "badge muted";
     byId("connection-badge").textContent = "○ Nicht verbunden";
     byId("connection-message").className = "message success";
@@ -647,34 +660,103 @@ function renderOpenPoints() {
 }
 
 function startMonitor() {
-  if (monitorSocket) monitorSocket.close();
+  if (!busConnected) {
+    byId("monitor-state").className = "badge muted";
+    byId("monitor-state").textContent = "○ Keine KNX-Verbindung";
+    return;
+  }
+  if (monitorSocket && monitorSocket.readyState <= WebSocket.OPEN) return;
   const protocol = location.protocol === "https:" ? "wss" : "ws";
   monitorSocket = new WebSocket(`${protocol}://${location.host}/api/knx/monitor`);
   monitorSocket.onopen = () => {
+    monitorRunning = true;
     byId("monitor-state").className = "badge good";
     byId("monitor-state").textContent = "● Monitor aktiv";
+    byId("monitor-toggle-button").className = "danger monitor-stop";
+    byId("monitor-toggle-button").textContent = "Monitor stoppen";
   };
   monitorSocket.onmessage = (event) => addTelegram(JSON.parse(event.data));
   monitorSocket.onclose = () => {
-    byId("monitor-state").className = "badge muted";
-    byId("monitor-state").textContent = "○ Monitor getrennt";
+    monitorRunning = false;
+    monitorSocket = null;
+    byId("monitor-state").className = busConnected ? "badge info" : "badge muted";
+    byId("monitor-state").textContent = busConnected ? "Ⅱ Monitor gestoppt" : "○ Monitor getrennt";
+    byId("monitor-toggle-button").className = "primary";
+    byId("monitor-toggle-button").textContent = "Monitor starten";
   };
 }
 
-function addTelegram(telegram) {
-  const body = byId("monitor-body");
-  body.querySelector(".monitor-empty")?.remove();
-  const row = document.createElement("tr");
-  const time = new Date(telegram.time).toLocaleTimeString("de-CH", {hour12: false, fractionalSecondDigits: 3});
-  const destination = telegram.group_name ? `${telegram.destination} · ${telegram.group_name}` : telegram.destination;
-  row.innerHTML = `<td>${escapeHtml(time)}</td><td>${escapeHtml(telegram.source)}</td><td>${escapeHtml(destination)}</td><td>${escapeHtml(telegram.dpt || "—")}</td><td>${escapeHtml(telegram.service)}${telegram.secure ? " · Secure" : ""}</td><td class="monitor-value">${escapeHtml(telegram.value || "—")}</td><td class="monitor-raw">${escapeHtml(telegram.raw || "—")}</td>`;
-  body.prepend(row);
-  while (body.rows.length > 250) body.deleteRow(-1);
+function stopMonitor() {
+  if (monitorSocket) monitorSocket.close();
+  else {
+    monitorRunning = false;
+    byId("monitor-state").className = busConnected ? "badge info" : "badge muted";
+    byId("monitor-state").textContent = busConnected ? "Ⅱ Monitor gestoppt" : "○ Monitor getrennt";
+  }
 }
 
-byId("clear-monitor-button").addEventListener("click", () => {
-  byId("monitor-body").innerHTML = '<tr class="monitor-empty"><td colspan="7">Anzeige geleert. Neue Telegramme erscheinen automatisch.</td></tr>';
+function updateMonitorConnectionBadge() {
+  const badge = byId("monitor-connection-badge");
+  badge.className = busConnected ? "badge good" : "badge muted";
+  badge.textContent = busConnected ? "✓ KNX verbunden" : "○ Nicht verbunden";
+  if (!busConnected) stopMonitor();
+}
+
+function addTelegram(telegram) {
+  monitorTelegrams.unshift(telegram);
+  if (monitorTelegrams.length > 2000) monitorTelegrams.length = 2000;
+  renderMonitor();
+}
+
+function monitorMatches(telegram) {
+  const search = byId("monitor-search").value.trim().toLocaleLowerCase("de-CH");
+  const source = byId("monitor-source-filter").value.trim().toLocaleLowerCase("de-CH");
+  const service = byId("monitor-service-filter").value;
+  const destinationText = `${telegram.destination || ""} ${telegram.group_name || ""} ${telegram.value || ""}`.toLocaleLowerCase("de-CH");
+  if (search && !destinationText.includes(search)) return false;
+  if (source && !String(telegram.source || "").toLocaleLowerCase("de-CH").includes(source)) return false;
+  if (service && telegram.service !== service) return false;
+  if (byId("monitor-secure-only").checked && !telegram.secure) return false;
+  return true;
+}
+
+function renderMonitor() {
+  const filtered = monitorTelegrams.filter(monitorMatches);
+  const rows = filtered.slice(0, 500);
+  byId("monitor-total-count").textContent = monitorTelegrams.length;
+  byId("monitor-visible-count").textContent = filtered.length;
+  const filtersActive = Boolean(
+    byId("monitor-search").value.trim()
+    || byId("monitor-source-filter").value.trim()
+    || byId("monitor-service-filter").value
+    || byId("monitor-secure-only").checked
+  );
+  byId("monitor-filter-note").textContent = filtersActive ? "Filter aktiv" : "Keine Filter aktiv";
+  if (!rows.length) {
+    byId("monitor-body").innerHTML = `<tr class="monitor-empty"><td colspan="7">${filtersActive ? "Keine passenden Telegramme gefunden." : "Noch keine Telegramme aufgezeichnet."}</td></tr>`;
+    return;
+  }
+  byId("monitor-body").innerHTML = rows.map((telegram) => {
+    const time = new Date(telegram.time).toLocaleTimeString("de-CH", {hour12: false, fractionalSecondDigits: 3});
+    const destination = telegram.group_name ? `${telegram.destination} · ${telegram.group_name}` : telegram.destination;
+    return `<tr><td>${escapeHtml(time)}</td><td>${escapeHtml(telegram.source)}</td><td>${escapeHtml(destination)}</td><td>${escapeHtml(telegram.dpt || "—")}</td><td>${escapeHtml(telegram.service)}${telegram.secure ? " · Secure" : ""}</td><td class="monitor-value">${escapeHtml(telegram.value || "—")}</td><td class="monitor-raw" title="${escapeHtml(telegram.raw || "—")}">${escapeHtml(telegram.raw || "—")}</td></tr>`;
+  }).join("");
+}
+
+byId("monitor-toggle-button").addEventListener("click", () => {
+  if (monitorRunning) stopMonitor();
+  else startMonitor();
 });
+
+["monitor-search", "monitor-source-filter"].forEach((id) => byId(id).addEventListener("input", renderMonitor));
+["monitor-service-filter", "monitor-secure-only"].forEach((id) => byId(id).addEventListener("change", renderMonitor));
+
+byId("clear-monitor-button").addEventListener("click", () => {
+  monitorTelegrams = [];
+  renderMonitor();
+});
+
+updateMonitorConnectionBadge();
 
 byId("shutdown-button").addEventListener("click", () => byId("shutdown-dialog").showModal());
 
