@@ -19,7 +19,7 @@
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
       </nav>
-      <div class="credits">Technische Referenz<br /><a href="https://github.com/martinhoefling/SpectrumKNX" target="_blank" rel="noreferrer">SpectrumKNX ↗</a></div>
+      <div class="sidebar-spacer" aria-hidden="true"></div>
       <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
       <a class="return-button" href="https://toolbox.ckoeppen.ch/">← Zurück zur Toolbox</a>
     </aside>
@@ -99,7 +99,7 @@
       </section>
 
       <section class="panel address-scan-panel">
-        <div class="panel-heading"><div><p class="eyebrow">OHNE ETS-PROJEKT NUTZBAR</p><h2>Physikalische Adressen suchen</h2></div><span class="badge info">KNX-Linienscan</span></div>
+        <div class="panel-heading"><div><p class="eyebrow standalone-scan-label">OHNE ETS-PROJEKT NUTZBAR</p><h2>Physikalische Adressen suchen</h2></div><span class="badge info">KNX-Linienscan</span></div>
         <div class="address-scan-controls">
           <label>Bereich<input id="scan-area" type="number" min="0" max="15" value="1" /></label>
           <label>Linie<input id="scan-line" type="number" min="0" max="15" value="1" /></label>
@@ -120,7 +120,7 @@
       </section>
 
       <section class="panel topology-panel">
-        <div class="panel-heading"><div><p class="eyebrow">PROJEKTÜBERSICHT</p><h2>KNX-Topologie</h2></div><div class="topology-actions"><span class="legend"><i class="dot gray"></i> ungeprüft <i class="dot green"></i> OK <i class="dot blue-dot"></i> Info <i class="dot orange"></i> Warnung <i class="dot red"></i> Fehler</span><button id="device-scan-button" class="primary" type="button" disabled>Geräte prüfen</button></div></div>
+        <div class="panel-heading"><div><p class="eyebrow">PROJEKTÜBERSICHT</p><h2>KNX-Topologie</h2></div><div class="topology-actions"><span class="legend"><i class="dot gray"></i> ungeprüft <i class="dot green"></i> OK <i class="dot blue-dot"></i> Info <i class="dot orange"></i> Warnung <i class="dot red"></i> Fehler</span><label class="diagnostic-line-label">Diagnoseumfang<select id="diagnostic-line-select" disabled><option value="">Alle Linien</option></select></label><button id="device-scan-button" class="primary" type="button" disabled>Geräte prüfen</button></div></div>
         <div id="scan-progress" class="scan-progress" hidden><span></span><small>0 / 0 Geräte geprüft</small></div>
         <div id="topology" class="topology-empty"><span>◇</span><strong>Projekt laden, um Bereiche, Linien und Geräte darzustellen</strong></div>
         <section id="open-points" class="open-points" hidden>
