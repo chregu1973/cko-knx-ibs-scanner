@@ -8,6 +8,34 @@ let selectedScanAddress = null;
 let monitorTelegrams = [];
 let monitorRunning = false;
 
+function deviceLineAddress(device) {
+  return String(device.address || "").split(".").slice(0, 2).join(".");
+}
+
+function populateDiagnosticLines(topology) {
+  const select = byId("diagnostic-line-select");
+  const lines = [];
+  (topology || []).forEach((area) => (area.lines || []).forEach((line) => {
+    const physicalCount = (line.devices || []).filter((device) => device.kind !== "dummy").length;
+    if (!physicalCount) return;
+    const address = line.full_address || line.address;
+    lines.push({address, label: `${address} · ${area.name} / ${line.name}`, count: physicalCount});
+  }));
+  select.innerHTML = `<option value="">Alle Linien</option>${lines.map((line) => `<option value="${escapeHtml(line.address)}">${escapeHtml(line.label)} (${line.count})</option>`).join("")}`;
+  select.disabled = lines.length === 0;
+}
+
+function updateGlobalDeviceStats() {
+  const cards = [...document.querySelectorAll('.device-card[data-kind="physical"]')];
+  const ok = cards.filter((card) => card.classList.contains("online")).length;
+  const errors = cards.filter((card) => card.classList.contains("offline")).length;
+  const warnings = cards.filter((card) => card.classList.contains("warning")).length;
+  const open = cards.length - ok - errors - warnings;
+  document.querySelector(".stats article:nth-child(2) strong").textContent = ok;
+  document.querySelector(".stats article:nth-child(3) strong").textContent = errors;
+  byId("open-count").textContent = open;
+}
+
 function showView(view) {
   document.querySelectorAll(".app-view").forEach((element) => {
     element.hidden = element.id !== `${view}-view`;
@@ -389,6 +417,7 @@ byId("project-form").addEventListener("submit", async (event) => {
     message.textContent = `${project.device_count} Geräte und ${project.group_address_count} Gruppenadressen eingelesen.`;
     const topology = byId("topology");
     renderTopology(project.topology, project.devices);
+    populateDiagnosticLines(project.topology);
     updateTopologySummaries();
     byId("device-scan-button").disabled = projectDevices.length === 0 || byId("connection-badge").classList.contains("muted");
   } catch (error) {
@@ -402,12 +431,17 @@ byId("device-scan-button").addEventListener("click", async () => {
   const progress = byId("scan-progress");
   const bar = progress.querySelector("span");
   const label = progress.querySelector("small");
-  let onlineCount = 0;
-  let errorCount = 0;
   button.disabled = true;
   progress.hidden = false;
   bar.style.width = "0";
-  const checkableDevices = projectDevices.filter((device) => device.kind !== "dummy");
+  const selectedLine = byId("diagnostic-line-select").value;
+  const checkableDevices = projectDevices.filter((device) => device.kind !== "dummy" && (!selectedLine || deviceLineAddress(device) === selectedLine));
+  if (!checkableDevices.length) {
+    button.disabled = false;
+    progress.hidden = true;
+    window.alert("In der ausgewählten Linie sind keine prüfbaren Geräte vorhanden.");
+    return;
+  }
   const diagnosticDevice = checkableDevices.find((device) => device.test_policy === "normal") || checkableDevices[0];
   if (diagnosticDevice) {
     button.textContent = `Diagnosetest ${diagnosticDevice.address} …`;
@@ -423,7 +457,7 @@ byId("device-scan-button").addEventListener("click", async () => {
         const proceed = window.confirm(
           `Der Diagnosetest mit ${diagnosticDevice.address} erhielt keine Antwort.\n\n` +
           "Mögliche Ursache: ungeeignete oder bereits belegte KNX-Tunneladresse, Linienkoppler oder VPN-Routing.\n\n" +
-          "Trotzdem alle Geräte prüfen?"
+          `Trotzdem ${selectedLine ? `die Linie ${selectedLine}` : "alle Linien"} prüfen?`
         );
         if (!proceed) {
           button.disabled = false;
@@ -464,23 +498,23 @@ byId("device-scan-button").addEventListener("click", async () => {
         : rfPlusWarning
           ? "⚠ RF+ · Antwort abhängig von Geräteversorgung"
           : "× Keine Antwort";
-      if (data.online) onlineCount += 1;
-      else if (!rfPlusWarning) errorCount += 1;
     } catch (error) {
       card.className = "device-card offline";
       card.querySelector("small").textContent = `× ${error.message}`;
-      errorCount += 1;
     }
     const completed = index + 1;
     bar.style.width = `${(completed / checkableDevices.length) * 100}%`;
     label.textContent = `${completed} / ${checkableDevices.length} physische Geräte geprüft`;
-    document.querySelector(".stats article:nth-child(2) strong").textContent = onlineCount;
-    document.querySelector(".stats article:nth-child(3) strong").textContent = errorCount;
-    byId("open-count").textContent = checkableDevices.length - completed;
+    updateGlobalDeviceStats();
     updateTopologySummaries();
   }
   button.disabled = false;
-  button.textContent = "Geräte erneut prüfen";
+  button.textContent = selectedLine ? `Linie ${selectedLine} erneut prüfen` : "Geräte erneut prüfen";
+});
+
+byId("diagnostic-line-select").addEventListener("change", (event) => {
+  const line = event.target.value;
+  byId("device-scan-button").textContent = line ? `Linie ${line} prüfen` : "Alle Linien prüfen";
 });
 
 function renderTopology(areas, fallbackDevices) {
@@ -772,7 +806,7 @@ byId("shutdown-dialog").addEventListener("close", async () => {
     if (monitorSocket) monitorSocket.close();
     document.body.innerHTML = `<main class="shutdown-screen"><div><span>✓</span><h1>Anwendung beendet</h1><p>${escapeHtml(data.message)}</p><small>Das Programmfenster wird geschlossen.</small></div></main>`;
     if (window.pywebview?.api?.close_window) {
-      await window.pywebview.api.close_window();
+      window.pywebview.api.close_window().catch(() => window.close());
       return;
     }
     setTimeout(() => window.close(), 250);
