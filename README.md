@@ -3,7 +3,11 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
-## Version 0.7.0
+## Version 0.7.1
+
+Version 0.7.1 korrigiert den Windows-Schließablauf: Nach dem sauberen Trennen der
+KNX-Verbindung wird zuerst das native WebView-Fenster geschlossen und erst danach
+der lokale Hintergrunddienst beendet.
 
 Neu: Der KNX-Gruppenmonitor hat eine eigene, übersichtliche Seite. Die Aufzeichnung
 kann ohne Trennung der KNX-Verbindung gestoppt und anschließend nach Gruppenadresse,

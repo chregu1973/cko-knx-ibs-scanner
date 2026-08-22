@@ -771,10 +771,11 @@ byId("shutdown-dialog").addEventListener("close", async () => {
     if (!response.ok) throw new Error(data.detail || "Anwendung konnte nicht beendet werden");
     if (monitorSocket) monitorSocket.close();
     document.body.innerHTML = `<main class="shutdown-screen"><div><span>✓</span><h1>Anwendung beendet</h1><p>${escapeHtml(data.message)}</p><small>Das Programmfenster wird geschlossen.</small></div></main>`;
-    setTimeout(async () => {
-      if (window.pywebview?.api?.close_window) await window.pywebview.api.close_window();
-      else window.close();
-    }, 500);
+    if (window.pywebview?.api?.close_window) {
+      await window.pywebview.api.close_window();
+      return;
+    }
+    setTimeout(() => window.close(), 250);
   } catch (error) {
     button.disabled = false;
     button.textContent = "KNX trennen & beenden";

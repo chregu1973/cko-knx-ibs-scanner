@@ -33,7 +33,9 @@ def set_shutdown_handler(handler: Callable[[], None] | None) -> None:
 
 
 async def _shutdown_after_response() -> None:
-    await asyncio.sleep(0.4)
+    # Keep the local page and pywebview bridge alive long enough for the
+    # browser-side close command to reach the native window.
+    await asyncio.sleep(2.0)
     if _shutdown_handler is not None:
         _shutdown_handler()
 
