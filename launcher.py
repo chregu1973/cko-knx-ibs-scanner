@@ -62,10 +62,33 @@ class DesktopApi:
 
     def __init__(self) -> None:
         self.window: Any | None = None
+        self.closed = threading.Event()
+
+    def mark_closed(self) -> None:
+        self.closed.set()
 
     def close_window(self) -> bool:
-        if self.window is not None:
-            self.window.destroy()
+        window = self.window
+        if window is None:
+            return True
+
+        # Never destroy WebView synchronously inside its JavaScript bridge call.
+        # The bridge has to return first; otherwise Edge WebView2 can wait forever
+        # and leave the final "Anwendung beendet" page visible.
+        def destroy_window() -> None:
+            time.sleep(0.15)
+            try:
+                window.destroy()
+            except Exception:
+                LOGGER.exception("Das WebView-Fenster konnte nicht regulär geschlossen werden")
+
+        def shutdown_watchdog() -> None:
+            if not self.closed.wait(timeout=4):
+                LOGGER.warning("WebView reagiert nicht auf Schließen; Prozess wird beendet")
+                os._exit(0)
+
+        threading.Thread(target=destroy_window, name="cko-ibs-close-window", daemon=True).start()
+        threading.Thread(target=shutdown_watchdog, name="cko-ibs-close-watchdog", daemon=True).start()
         return True
 
 
@@ -85,6 +108,7 @@ def _run_desktop_window(url: str, stop_server: Callable[[], None] | None = None)
         text_select=True,
     )
     api.window = window
+    window.events.closed += api.mark_closed
     if stop_server is not None:
         window.events.closed += stop_server
     webview.start(

@@ -3,11 +3,13 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
-## Version 0.7.1
+## Version 0.8.0
 
-Version 0.7.1 korrigiert den Windows-Schließablauf: Nach dem sauberen Trennen der
-KNX-Verbindung wird zuerst das native WebView-Fenster geschlossen und erst danach
-der lokale Hintergrunddienst beendet.
+Version 0.8.0 ergänzt eine gezielte Linienauswahl für die KNX-Geräteprüfung und
+hebt den ohne ETS-Projekt nutzbaren Linienscan deutlicher hervor. Der native
+Windows-Schließablauf wurde zusätzlich abgesichert: Nach dem sauberen Trennen der
+KNX-Verbindung wird das WebView-Fenster asynchron geschlossen; ein Watchdog beendet
+eine blockierte WebView-Instanz.
 
 Neu: Der KNX-Gruppenmonitor hat eine eigene, übersichtliche Seite. Die Aufzeichnung
 kann ohne Trennung der KNX-Verbindung gestoppt und anschließend nach Gruppenadresse,
@@ -79,6 +81,4 @@ Unter Windows lauten die letzten beiden Befehle:
 
 Dieses Projekt steht unter GPL-3.0. Es nutzt unter anderem
 [xknx](https://github.com/XKNX/xknx) und
-[xknxproject](https://github.com/XKNX/xknxproject). Die technische Umsetzung
-orientiert sich an [SpectrumKNX](https://github.com/martinhoefling/SpectrumKNX),
-einem freien KNX-Telegramm- und Analysewerkzeug.
+[xknxproject](https://github.com/XKNX/xknxproject).
