@@ -137,14 +137,16 @@ def main() -> None:
 
         # Import the application object directly. Besides giving clearer runtime
         # errors, this ensures PyInstaller includes the complete local package.
+        from cko_ibs import __version__
         from cko_ibs.main import app, set_shutdown_handler
 
         host = "127.0.0.1"
         port = int(os.getenv("CKO_IBS_PORT", "8766"))
         url = f"http://{host}:{port}"
+        desktop_url = f"{url}/?v={__version__}"
         if _application_is_running(url):
             LOGGER.info("Bereits laufende Instanz erkannt. Öffne vorhandene Oberfläche im WebView.")
-            _run_desktop_window(url)
+            _run_desktop_window(desktop_url)
             return
         LOGGER.info("CKO KNX IBS Scanner startet lokal auf %s", url)
         config = uvicorn.Config(app, host=host, port=port, log_config=None, access_log=False)
@@ -158,7 +160,7 @@ def main() -> None:
         def stop_server() -> None:
             server.should_exit = True
 
-        _run_desktop_window(url, stop_server)
+        _run_desktop_window(desktop_url, stop_server)
         server.should_exit = True
         server_thread.join(timeout=8)
     except Exception:

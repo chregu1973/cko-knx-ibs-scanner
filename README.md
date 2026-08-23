@@ -3,9 +3,9 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
-## Version 0.8.1
+## Version 0.8.2
 
-Version 0.8.1 zeigt die installierte Programmversion direkt in der Sidebar an.
+Version 0.8.2 verhindert veraltete WebView-Inhalte nach einem Update. Die Oberfläche wird immer aus der aktuell installierten Version geladen; die Versionsnummer bleibt direkt in der Sidebar sichtbar.
 Der frühere externe Referenzverweis ist vollständig entfernt.
 
 Version 0.8.0 ergänzt eine gezielte Linienauswahl für die KNX-Geräteprüfung und
