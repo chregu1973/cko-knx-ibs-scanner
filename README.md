@@ -3,7 +3,10 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
-## Version 0.8.0
+## Version 0.8.1
+
+Version 0.8.1 zeigt die installierte Programmversion direkt in der Sidebar an.
+Der frühere externe Referenzverweis ist vollständig entfernt.
 
 Version 0.8.0 ergänzt eine gezielte Linienauswahl für die KNX-Geräteprüfung und
 hebt den ohne ETS-Projekt nutzbaren Linienscan deutlicher hervor. Der native
