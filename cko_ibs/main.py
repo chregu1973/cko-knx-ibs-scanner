@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -24,6 +24,17 @@ STATIC_DIR = PACKAGE_DIR / "static"
 
 app = FastAPI(title="CKO KNX IBS Scanner", version=__version__)
 _shutdown_handler: Callable[[], None] | None = None
+
+
+@app.middleware("http")
+async def disable_desktop_ui_cache(request: Request, call_next):
+    """Prevent Edge WebView2 from showing UI files from an older install."""
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 
 def set_shutdown_handler(handler: Callable[[], None] | None) -> None:
