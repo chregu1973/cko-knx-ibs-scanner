@@ -105,7 +105,8 @@
 
 .topology-actions,
 .monitor-actions { display: flex; align-items: center; gap: 14px; }
-.sidebar-spacer { margin-top: auto; }
+.sidebar-version { display: grid; gap: 4px; margin-top: auto; padding: 15px; color: var(--muted); font-size: 11px; }
+.sidebar-version strong { color: #63caff; font-size: 12px; font-weight: 700; }
 .standalone-scan-label { display: inline-flex; padding: 5px 9px; border: 1px solid #258fd0; border-radius: 999px; background: #0d2940; color: #63caff; box-shadow: 0 0 18px #2089ff33; }
 .diagnostic-line-label { display: grid; gap: 4px; color: var(--muted); font-size: 10px; }
 .diagnostic-line-label select { min-width: 190px; height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #09121c; color: #fff; }
