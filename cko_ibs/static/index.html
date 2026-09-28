@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>CKO KNX IBS Scanner</title>
     <link rel="icon" href="/static/cko-toolbox-logo.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=0.9.0" />
-    <link rel="stylesheet" href="/static/connection.css?v=0.9.0" />
-    <link rel="stylesheet" href="/static/branding.css?v=0.9.0" />
-    <link rel="stylesheet" href="/static/sco.css?v=0.9.0" />
+    <link rel="stylesheet" href="/static/styles.css?v=0.9.1" />
+    <link rel="stylesheet" href="/static/connection.css?v=0.9.1" />
+    <link rel="stylesheet" href="/static/branding.css?v=0.9.1" />
+    <link rel="stylesheet" href="/static/sco.css?v=0.9.1" />
   </head>
   <body>
     <aside class="sidebar">
@@ -21,7 +21,7 @@
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
       </nav>
-      <div class="sidebar-version"><span>Installierte Version</span><strong>KNX IBS Scanner 0.9.0</strong></div>
+      <div class="sidebar-version"><span>Installierte Version</span><strong>KNX IBS Scanner 0.9.1</strong></div>
       <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
       <a class="return-button" href="https://toolbox.ckoeppen.ch/">← Zurück zur Toolbox</a>
     </aside>
@@ -167,7 +167,7 @@
           <div class="header-actions"><span id="sco-connection-badge" class="badge muted">○ Nicht verbunden</span><span id="sco-monitor-badge" class="badge muted">○ Mitschnitt aus</span></div>
         </header>
         <div id="sco-lock-banner" class="sco-lock-banner" hidden></div>
-        <section class="sco-note"><strong>Hinweis:</strong> Belegung nach Flow v3 und KNXUltimate, am Bus noch nicht bestätigt. Die Priorität bei der Sperre ist eine Annahme. Die Beschattungszentrale kann Testbefehle mit ihrer Automatik übersteuern. Zuerst mit der Simulation der Zentrale oder einem Testsektor prüfen.</section>
+        <section class="sco-note"><strong>Hinweis:</strong> Fahrbefehl und Bedienung sind am Bus geprüft. Der Sicherheitsablauf bildet die Telegramme einer Zentrale Byte für Byte nach; eigene Sicherheitsbefehle zuerst an einer Simulation oder einem Testsektor prüfen. Die Beschattungszentrale kann Testbefehle mit ihrer Automatik übersteuern. Zuerst mit der Simulation der Zentrale oder einem Testsektor prüfen.</section>
         <div class="sco-grid">
           <section class="panel">
             <div class="panel-heading"><h2>1 · Ziel</h2></div>
@@ -209,9 +209,9 @@
               <label>Priorität<select id="sco-safety-priority"><option value="sicherheit">Sicherheitsbefehl</option><option value="warn">Warnbefehl</option><option value="gefahr">Gefahrenbefehl</option></select></label>
               <label>Fahren auf<select id="sco-safety-drive"><option value="oben">Obere Endlage</option><option value="unten">Untere Endlage</option><option value="fix">Fixposition</option><option value="keine">Keine Fahrbewegung</option></select></label>
               <label>Fixposition<select id="sco-safety-position"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
-              <label>Sperre<select id="sco-lock"><option value="beide">Fahrbefehls- und Tastensperre</option><option value="fahrbefehl">Fahrbefehlssperre</option><option value="taste">Tastensperre</option></select></label>
+              <label>Sperre<select id="sco-lock"><option value="taste" selected>Tastensperre (wie Zentrale)</option><option value="fahrbefehl">Fahrbefehlssperre</option><option value="beide">Fahrbefehls- und Tastensperre (einzeln)</option></select></label>
               <label class="check wide"><input id="sco-allow-protected" type="checkbox" /> Sicherheitsbefehle freigeben – ich teste an der Simulation der Zentrale oder einem Testsektor</label>
-              <p class="field-hint wide">Setzen = Fahrbefehl mit Sicherheitspriorität + Sperre aktiv. Aufheben = Sperre passiv mit gleicher Priorität und Sperrart.</p>
+              <p class="field-hint wide">Ablauf wie die Zentrale: Setzen = Sperre setzen, danach Fahrbefehl mit gewählter Priorität. Aufheben = Fahrbefehlssperre und Tastensperre einzeln löschen.</p>
             </div>
             <div class="sco-form" data-mode="raw" hidden>
               <label class="wide">6 Byte hex (z. B. aus dem Mitschnitt)<input id="sco-raw" placeholder="47 04 63 04 00 00" autocomplete="off" /></label>
@@ -227,11 +227,12 @@
             <h2>3 · Mitschnitt und Datenauflösung</h2>
             <div class="sco-actions">
               <button id="sco-monitor-button" class="primary" type="button">Mitschnitt starten</button>
-              <a class="secondary-link" href="/api/sco/export?format=json" download>Export JSON</a>
-              <a class="secondary-link" href="/api/sco/export?format=csv" download>Export CSV</a>
+              <button id="sco-export-json" class="secondary" type="button">Export JSON</button>
+              <button id="sco-export-csv" class="secondary" type="button">Export CSV</button>
               <button id="sco-clear-button" class="secondary" type="button">Mitschnitt löschen</button>
             </div>
           </div>
+          <p id="sco-export-message" class="message"></p>
           <p class="field-hint">SCO-Telegramme werden auf markierten Gruppenadressen und auf Adressen ohne Standard-DPT dekodiert. «= Vorschau» zeigt, dass ein Telegramm Byte für Byte der aktuellen Vorschau entspricht.</p>
           <div class="monitor-table-wrap"><table class="monitor-table sco-table"><thead><tr><th>Zeit</th><th>Herkunft</th><th>Von</th><th>GA</th><th>Ziel</th><th>Befehl</th><th>Priorität</th><th>Aktion</th><th>Hex</th><th></th></tr></thead><tbody id="sco-body"><tr class="monitor-empty"><td colspan="10">Verbinden und Mitschnitt starten.</td></tr></tbody></table></div>
         </section>
@@ -253,7 +254,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/app.js?v=0.9.0"></script>
-    <script src="/static/sco.js?v=0.9.0"></script>
+    <script src="/static/app.js?v=0.9.1"></script>
+    <script src="/static/sco.js?v=0.9.1"></script>
   </body>
 </html>

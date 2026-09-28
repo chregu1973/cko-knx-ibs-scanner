@@ -76,18 +76,42 @@ def test_protected_priorities_are_blocked_unless_released() -> None:
     assert decode(data)["priority"] == "Sicherheitsbefehl" and decode(data)["protected"]
 
 
-def test_safety_sequence_sets_drive_and_lock_and_releases_with_passive_lock() -> None:
+def test_safety_sequence_follows_the_central_controller() -> None:
     sequence = safety_sequence({"sector": 12, "drive": "oben", "lock": "beide", "priority": "sicherheit"})
-    drive, lock_on = (decode(item) for item in sequence["set"])
-    (lock_off,) = (decode(item) for item in sequence["release"])
-    assert drive["command"] == "Fahrbefehl" and drive["action"] == "obere Endlage"
-    assert drive["priority"] == "Sicherheitsbefehl"
-    assert lock_on["action"] == "Fahrbefehls- und Tastensperre setzen" and lock_on["lock_active"] is True
-    assert lock_off["action"] == "Fahrbefehls- und Tastensperre löschen" and lock_off["lock_active"] is False
-    assert lock_on["priority_confirmed"] is False  # Lage der Priorität bei der Sperre ist noch Annahme
-    assert {item["target"] for item in (drive, lock_on, lock_off)} == {"Sektor 12"}
+    lock_drive, lock_key, drive = (decode(item) for item in sequence["set"])
+    assert lock_drive["action"] == "Fahrbefehlssperre setzen" and lock_drive["lock_active"] is True
+    assert lock_key["action"] == "Tastensperre setzen"
+    assert drive["command"] == "Fahrbefehl" and drive["priority"] == "Sicherheitsbefehl"
+    assert drive["action"] == "obere Endlage"
+    released = [decode(item)["action"] for item in sequence["release"]]
+    assert released == ["Fahrbefehlssperre löschen", "Tastensperre löschen"]
+    assert lock_key["priority"] is None  # die Sperre trägt keine Priorität
+    assert {item["target"] for item in (lock_drive, lock_key, drive)} == {"Sektor 12"}
     with pytest.raises(SCOError):
         safety_sequence({"sector": 12, "priority": "automatik"})
+
+
+def test_reproduces_emx8_telegrams_byte_for_byte() -> None:
+    """Mitschnitt der Zentrale (Quelle 1.1.2, GA 10/0/10) vom 28.09.2026."""
+    sequence = safety_sequence({"sector": 1, "drive": "oben", "lock": "taste", "priority": "gefahr"})
+    assert [sco.to_hex(frame) for frame in sequence["set"]] == ["01 10 02 02 00 00", "01 04 C1 00 00 00"]
+    assert [sco.to_hex(frame) for frame in sequence["release"]] == ["01 10 01 00 00 00", "01 10 02 00 00 00"]
+    assert decode(parse_hex("01 10 02 02 00 00"))["action"] == "Tastensperre setzen"
+    assert decode(parse_hex("01 04 C1 00 00 00"))["priority"] == "Gefahrenbefehl"
+    assert decode(parse_hex("01 10 01 00 00 00"))["action"] == "Fahrbefehlssperre löschen"
+    assert decode(parse_hex("01 58 00 FF 00 FF"))["action"] == "Winkel 0–255, Höhe 0–255"
+    assert decode(parse_hex("01 08 00 14 00 00"))["command"] == "Wertkorrektur"
+    assert decode(parse_hex("01 2C 00 00 00 00"))["command"] == "Busüberwachung"
+
+
+def test_setting_a_lock_is_protected_releasing_is_not() -> None:
+    with pytest.raises(SCOError):
+        encode({"sector": 1, "lock": "taste", "active": True})
+    with pytest.raises(SCOError):
+        encode({"hex": "01 10 02 02 00 00"})
+    assert sco.to_hex(encode({"sector": 1, "lock": "taste", "active": False})) == "01 10 02 00 00 00"
+    assert decode(parse_hex("01 10 02 02 00 00"))["protected"] is True
+    assert decode(parse_hex("01 10 02 00 00 00"))["protected"] is False
 
 
 def test_unknown_values_are_reported_not_guessed() -> None:
@@ -132,8 +156,8 @@ def test_api_preview_and_safety_pair() -> None:
     assert blocked.status_code == 400
     pair = client.post("/api/sco/safety", json={"spec": {"sector": 3, "drive": "oben", "lock": "beide",
                                                                "priority": "sicherheit"}}).json()
-    assert [item["decoded"]["command"] for item in pair["set"]] == ["Fahrbefehl", "Sperre setzen/löschen"]
-    assert pair["release"][0]["decoded"]["lock_active"] is False
+    assert [item["decoded"]["command"] for item in pair["set"]] == ["Sperre setzen/löschen", "Sperre setzen/löschen", "Fahrbefehl"]
+    assert [item["decoded"]["lock_active"] for item in pair["release"]] == [False, False]
 
 
 def test_sending_requires_confirmation_release_and_connection() -> None:
@@ -198,7 +222,8 @@ def test_sending_uses_six_byte_group_value_write(monkeypatch) -> None:
     items = asyncio.run(bus_connection.send_sco("8/0/5", frames, "Sicherheit setzen"))
     assert [len(telegram.payload.to_knx()) for telegram in sent] == [8, 8]  # 2 Byte APCI + 6 Datenbyte
     assert tuple(sent[0].payload.value.value) == tuple(frames[0])
-    assert items[1]["sco"]["action"] == "Fahrbefehls- und Tastensperre setzen"
+    assert items[0]["sco"]["action"] == "Tastensperre setzen"
+    assert items[1]["sco"]["priority"] == "Sicherheitsbefehl"
     assert items[0]["source"] == "1.12.252" and items[0]["origin"] == "IBS-Test: Sicherheit setzen"
     bus_connection.sco_log.clear()
     bus_connection.set_sco_addresses([])

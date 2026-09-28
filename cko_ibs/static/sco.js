@@ -121,7 +121,7 @@ async function scoSend(stepKey, preview = scoPreview) {
     const lockKey = `${preview.ga}|${preview.target}`;
     if (stepKey === "set") {
       const release = preview.steps.find((item) => item.key === "release");
-      scoLocks.set(lockKey, {ga: preview.ga, target: preview.target, label: step.frames[1]?.decoded.action || "Sperre", release});
+      scoLocks.set(lockKey, {ga: preview.ga, target: preview.target, label: step.frames.filter((frame) => frame.decoded.command_code === 4).map((frame) => frame.decoded.action).join(" + ") || "Sperre", release});
     }
     if (stepKey === "release") scoLocks.delete(lockKey);
     renderSCOLocks();
@@ -234,6 +234,41 @@ byId("sco-clear-button").addEventListener("click", async () => {
   renderSCOCapture(); renderSCOSectors();
 });
 byId("sco-sectors-button").addEventListener("click", renderSCOSectors);
+
+async function scoExport(format) {
+  const message = byId("sco-export-message");
+  message.className = "message";
+  message.textContent = "Export wird erstellt …";
+  try {
+    const response = await fetch(`/api/sco/export?format=${format}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const content = await response.text();
+    const filename = (response.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1] || `sco-mitschnitt.${format}`;
+    if (window.pywebview?.api?.save_text) {
+      // Windows-Programmfenster: nativer Dialog «Speichern unter»
+      const result = await window.pywebview.api.save_text(filename, content);
+      if (result?.saved) message.textContent = `Gespeichert: ${result.path}`;
+      else if (result?.cancelled) message.textContent = "Speichern abgebrochen.";
+      else throw new Error(result?.error || "Speichern fehlgeschlagen");
+      return;
+    }
+    const link = document.createElement("a");   // Browser: normaler Download
+    link.href = URL.createObjectURL(new Blob([content], {type: format === "csv" ? "text/csv" : "application/json"}));
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+    message.textContent = `Download gestartet: ${filename}`;
+  } catch (error) {
+    message.className = "message error";
+    message.textContent = `Export fehlgeschlagen: ${error.message}`;
+  }
+}
+
+byId("sco-export-json").addEventListener("click", () => scoExport("json"));
+byId("sco-export-csv").addEventListener("click", () => scoExport("csv"));
+
 byId("sco-view").addEventListener("click", (event) => {
   const replay = event.target.closest("[data-sco-replay]");
   if (replay) {

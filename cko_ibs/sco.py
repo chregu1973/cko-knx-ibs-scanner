@@ -6,8 +6,10 @@ Belegung nach Flow v3 (hbTec, 28.09.2026), KNXUltimate ``dpt60001`` und KNX-User
   das tiefste gesetzte Bit gibt die Gruppengrösse an.
 * Byte 1, Bit 2–7: Command. Byte 2–5: Parameter P1–P4.
 * Fahrbefehl (1): P1 Bit 5–7 Priorität, Bit 0–4 Funktion; P2 Fixposition 1–4.
-* Sperre (4): P1 Bit 0–1 Sperrart; P2 = 0 Sperre löschen (passiv), sonst setzen (aktiv).
-  ANNAHME: Die Priorität steht wie beim Fahrbefehl in P1 Bit 5–7. Am Bus mit der Zentrale bestätigen.
+* Sperre (4): P1 = Sperrart (1 Fahrbefehlssperre, 2 Tastensperre), keine Priorität; P2 = 0 Sperre
+  löschen (passiv), sonst setzen (aktiv). Die Zentrale setzt mit P2 = 02 (Mitschnitt vom 28.09.2026).
+* Sicherheit wie die Zentrale: zuerst Sperre setzen, dann Fahrbefehl mit Warn-/Sicherheits-/
+  Gefahrenpriorität; Aufheben = Fahrbefehlssperre und Tastensperre einzeln löschen.
 * Bedienung (5): P1 Bit 7 lokal (1) / Gruppe (0), Bit 0–6 Bedienart.
 
 Das Objekt ist kein KNX-Standard-Datenpunkt. Unbekannte Werte werden roh gemeldet, nie geraten.
@@ -37,6 +39,10 @@ DRIVE_NAMES = {0: "keine Fahrbewegung", 1: "obere Endlage", 2: "untere Endlage",
 OPERATION = ["lang auf", "lang ab", "kurz auf", "kurz ab", "Stopp", "lang-kurz auf", "lang-kurz ab"]
 LOCKS = {"fahrbefehl": 1, "taste": 2, "beide": 3}
 LOCK_NAMES = {1: "Fahrbefehlssperre", 2: "Tastensperre", 3: "Fahrbefehls- und Tastensperre"}
+# Wert, mit dem die Zentrale eine Sperre setzt (Mitschnitt: 01 10 02 02 00 00 = Tastensperre setzen)
+LOCK_SET_VALUE = 0x02
+# Sperrarten, die einzeln gesendet werden; «beide» (3) verwendet die Zentrale nicht
+LOCK_PARTS = {"fahrbefehl": ["fahrbefehl"], "taste": ["taste"], "beide": ["fahrbefehl", "taste"]}
 
 
 class SCOError(ValueError):
@@ -101,14 +107,13 @@ def encode(spec: dict[str, Any], allow_protected: bool = False) -> bytes:
     Beispiele:
       {"sector": 36, "drive": "fix", "position": 4, "priority": "prioritaet"}  → 47 04 63 04 00 00
       {"sector": 42, "operation": "lang auf"}                                    → 53 14 80 00 00 00
-      {"sector": 36, "lock": "beide", "active": True, "priority": "sicherheit"}  → Sperre setzen
+      {"sector": 1, "lock": "taste", "active": True}                              → 01 10 02 02 00 00
       {"hex": "47 04 63 04 00 00"}                                               → roh
     """
     if "hex" in spec:
         data = parse_hex(spec["hex"])
-        priority = data[2] >> 5
-        if data[1] >> 2 in {1, 4} and priority in PROTECTED_PRIORITIES and not allow_protected:
-            raise SCOError("Das Rohtelegramm enthält einen Warn-, Sicherheits- oder Gefahrenbefehl")
+        if _is_protected(data) and not allow_protected:
+            raise SCOError("Das Rohtelegramm enthält einen Sicherheitsbefehl oder setzt eine Sperre")
         return data
     if "drive" in spec:
         if spec["drive"] not in DRIVE:
@@ -121,11 +126,12 @@ def encode(spec: dict[str, Any], allow_protected: bool = False) -> bytes:
         byte0, byte1 = _header(spec, 1)
         return bytes([byte0, byte1, (_priority(spec, allow_protected) << 5) | DRIVE[spec["drive"]], position, 0, 0])
     if "lock" in spec:
-        if spec["lock"] not in LOCKS:
-            raise SCOError("Sperrart muss fahrbefehl, taste oder beide sein")
+        if spec["lock"] not in {"fahrbefehl", "taste"}:
+            raise SCOError("Sperrart muss fahrbefehl oder taste sein")
+        if spec.get("active") and not allow_protected:
+            raise SCOError("Eine Sperre setzen ist ein Sicherheitsbefehl und braucht eine ausdrückliche Freigabe")
         byte0, byte1 = _header(spec, 4)
-        priority = _priority(spec, allow_protected)
-        return bytes([byte0, byte1, (priority << 5) | LOCKS[spec["lock"]], 1 if spec.get("active") else 0, 0, 0])
+        return bytes([byte0, byte1, LOCKS[spec["lock"]], LOCK_SET_VALUE if spec.get("active") else 0, 0, 0])
     if "operation" in spec:
         if spec["operation"] not in OPERATION:
             raise SCOError(f"Bedienung muss eine von {', '.join(OPERATION)} sein")
@@ -136,20 +142,32 @@ def encode(spec: dict[str, Any], allow_protected: bool = False) -> bytes:
 
 
 def safety_sequence(spec: dict[str, Any]) -> dict[str, list[bytes]]:
-    """Sicherheit für einen Sektor: Setzen = Fahrbefehl + Sperre aktiv, Aufheben = Sperre passiv.
+    """Sicherheit für einen Sektor, Ablauf wie bei der Zentrale.
 
-    spec: {"sector"|"group", "drive", "position", "lock", "priority"} mit einer geschützten Priorität.
+    Setzen:   Sperre(n) setzen, danach Fahrbefehl mit Warn-, Sicherheits- oder Gefahrenpriorität.
+    Aufheben: Fahrbefehlssperre und Tastensperre einzeln löschen.
+    spec: {"sector"|"group", "priority", "drive", "position", "lock": "taste"|"fahrbefehl"|"beide"}
     """
     if PRIORITY_KEYS.get(spec.get("priority")) not in PROTECTED_PRIORITIES:
         raise SCOError("Eine Sicherheitssequenz braucht Warn-, Sicherheits- oder Gefahrenpriorität")
+    lock_kind = spec.get("lock", "taste")
+    if lock_kind not in LOCK_PARTS:
+        raise SCOError("Sperrart muss taste, fahrbefehl oder beide sein")
     target = {key: spec[key] for key in ("sector", "group") if key in spec}
+    locks = [encode({**target, "lock": part, "active": True}, allow_protected=True) for part in LOCK_PARTS[lock_kind]]
     drive = encode({**target, "drive": spec.get("drive", "oben"), "position": spec.get("position", 0),
                     "priority": spec["priority"]}, allow_protected=True)
-    lock = {**target, "lock": spec.get("lock", "beide"), "priority": spec["priority"]}
-    return {
-        "set": [drive, encode({**lock, "active": True}, allow_protected=True)],
-        "release": [encode({**lock, "active": False}, allow_protected=True)],
-    }
+    release = [encode({**target, "lock": part, "active": False}) for part in ("fahrbefehl", "taste")]
+    return {"set": [*locks, drive], "release": release}
+
+
+def _is_protected(data: bytes) -> bool:
+    command = data[1] >> 2
+    if command == 1:
+        return data[2] >> 5 in PROTECTED_PRIORITIES
+    if command == 4:
+        return data[3] != 0 and data[2] != 0  # Sperre setzen
+    return False
 
 
 def _action(command: int, data: bytes) -> str:
@@ -178,7 +196,7 @@ def decode(data: bytes | list[int]) -> dict[str, Any]:
     code = raw[0] | ((raw[1] & 0x03) << 8)
     command = raw[1] >> 2
     first, last = sector_range(code)
-    priority = raw[2] >> 5 if command in {1, 4} else None
+    priority = raw[2] >> 5 if command == 1 else None
     return {
         "hex": to_hex(raw),
         "sector_code": code,
@@ -189,9 +207,8 @@ def decode(data: bytes | list[int]) -> dict[str, Any]:
         "command": COMMANDS.get(command, f"unbekannt ({command})"),
         "priority_code": priority,
         "priority": (PRIORITIES.get(priority, f"unbekannt ({priority})") if priority is not None else None),
-        # Nur beim Fahrbefehl belegt; bei der Sperre ist die Lage der Priorität eine Annahme
-        "priority_confirmed": command == 1 if priority is not None else None,
-        "protected": priority in PROTECTED_PRIORITIES if priority is not None else False,
+        "priority_confirmed": True if priority is not None else None,
+        "protected": _is_protected(raw),
         "action": _action(command, raw),
         "lock_active": (raw[3] != 0) if command == 4 and raw[2] else None,
         "p1": raw[2], "p2": raw[3], "p3": raw[4], "p4": raw[5],
