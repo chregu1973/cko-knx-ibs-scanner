@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from cko_ibs import __version__
+from cko_ibs import __version__, sco
 from cko_ibs.bus_connection import bus_connection
 from cko_ibs.knx_discovery import discover_gateways, network_adapters
 from cko_ibs.project_reader import read_project
@@ -281,6 +282,156 @@ async def import_project(
             ) from exc
     bus_connection.configure_group_addresses(summary.pop("group_addresses", []))
     return {"project": summary, "stored_on_server": False}
+
+
+# --- SCO-Objekt (6 Byte) ------------------------------------------------------
+
+
+class SCOSpecRequest(BaseModel):
+    spec: dict
+    allow_protected: bool = False
+
+
+class SCODecodeRequest(BaseModel):
+    hex: str
+
+
+class SCOSendRequest(BaseModel):
+    group_address: str
+    frames: list[str]
+    label: str = ""
+    confirmed: bool = False
+    allow_protected: bool = False
+
+
+class SCOAddressRequest(BaseModel):
+    addresses: list[str]
+
+
+def _sco_error(exc: Exception) -> HTTPException:
+    return HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/sco/encode")
+async def sco_encode(request: SCOSpecRequest) -> dict:
+    try:
+        data = sco.encode(request.spec, allow_protected=request.allow_protected)
+    except (sco.SCOError, TypeError, ValueError) as exc:
+        raise _sco_error(exc) from exc
+    return {"hex": sco.to_hex(data), "decoded": sco.decode(data)}
+
+
+@app.post("/api/sco/decode")
+async def sco_decode(request: SCODecodeRequest) -> dict:
+    try:
+        return sco.decode(sco.parse_hex(request.hex))
+    except sco.SCOError as exc:
+        raise _sco_error(exc) from exc
+
+
+@app.post("/api/sco/safety")
+async def sco_safety(request: SCOSpecRequest) -> dict:
+    try:
+        sequence = sco.safety_sequence(request.spec)
+    except (sco.SCOError, TypeError, ValueError) as exc:
+        raise _sco_error(exc) from exc
+    return {step: [{"hex": sco.to_hex(frame), "decoded": sco.decode(frame)} for frame in frames]
+            for step, frames in sequence.items()}
+
+
+@app.post("/api/sco/send")
+async def sco_send(request: SCOSendRequest) -> dict:
+    if not request.confirmed:
+        raise HTTPException(status_code=428, detail="Senden muss in der Vorschau bestätigt werden.")
+    if not 1 <= len(request.frames) <= 4:
+        raise HTTPException(status_code=400, detail="Pro Auftrag 1 bis 4 Telegramme senden.")
+    try:
+        frames = [sco.parse_hex(frame) for frame in request.frames]
+        for frame in frames:
+            if sco.decode(frame)["protected"] and not request.allow_protected:
+                raise sco.SCOError(
+                    "Warn-, Sicherheits- oder Gefahrenbefehl: nur mit ausdrücklicher Freigabe senden.")
+        sent = await bus_connection.send_sco(request.group_address, frames, request.label)
+    except (sco.SCOError, ValueError) as exc:
+        raise _sco_error(exc) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Senden fehlgeschlagen: {exc}") from exc
+    return {"sent": sent}
+
+
+@app.get("/api/sco/addresses")
+async def sco_addresses() -> dict:
+    return {"addresses": bus_connection.sco_addresses, "suggestions": bus_connection.sco_suggestions()}
+
+
+@app.put("/api/sco/addresses")
+async def set_sco_addresses(request: SCOAddressRequest) -> dict:
+    try:
+        return {"addresses": bus_connection.set_sco_addresses(request.addresses)}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Ungültige Gruppenadresse: {exc}") from exc
+
+
+@app.get("/api/sco/log")
+async def sco_log() -> dict:
+    return {"entries": list(bus_connection.sco_log), "size": len(bus_connection.sco_log)}
+
+
+@app.delete("/api/sco/log")
+async def clear_sco_log() -> dict:
+    bus_connection.sco_log.clear()
+    return {"entries": [], "size": 0}
+
+
+def _sector_overview(entries: list[dict]) -> list[dict]:
+    overview: dict[tuple, dict] = {}
+    for entry in entries:
+        decoded = entry["decoded"]
+        key = (entry["destination"], decoded["target"], entry["source"])
+        row = overview.setdefault(key, {
+            "group_address": entry["destination"], "group_name": entry.get("group_name"),
+            "target": decoded["target"], "sector_from": decoded["sector_from"], "source": entry["source"],
+            "origin": entry.get("origin", "bus"), "count": 0, "commands": {}, "priorities": {},
+            "first_seen": entry["time"], "last_seen": entry["time"], "last_action": ""})
+        row["count"] += 1
+        row["commands"][decoded["command"]] = row["commands"].get(decoded["command"], 0)+1
+        if decoded["priority"]:
+            row["priorities"][decoded["priority"]] = row["priorities"].get(decoded["priority"], 0)+1
+        row["last_seen"], row["last_action"] = entry["time"], decoded["action"] or decoded["command"]
+    return sorted(overview.values(), key=lambda row: (row["group_address"], row["sector_from"], row["source"]))
+
+
+@app.get("/api/sco/sectors")
+async def sco_sectors() -> dict:
+    return {"sectors": _sector_overview(list(bus_connection.sco_log))}
+
+
+@app.get("/api/sco/export")
+async def sco_export(format: str = "json") -> Response:
+    entries = list(bus_connection.sco_log)
+    stamp = entries[-1]["time"][:19].replace(":", "-") if entries else "leer"
+    if format == "csv":
+        columns = ["time", "direction", "origin", "source", "destination", "group_name", "hex", "target",
+                   "command", "priority", "priority_confirmed", "action", "lock_active", "p1", "p2", "p3", "p4"]
+        lines = [";".join(columns)]
+        for entry in entries:
+            row = {**entry, **entry["decoded"]}
+            lines.append(";".join(str(row.get(column, "") if row.get(column) is not None else "").replace(";", ",")
+                                  for column in columns))
+        return Response("\ufeff"+"\n".join(lines)+"\n", media_type="text/csv",
+                        headers={"Content-Disposition": f'attachment; filename="sco-mitschnitt-{stamp}.csv"'})
+    if format != "json":
+        raise HTTPException(status_code=400, detail="Format muss json oder csv sein.")
+    document = {
+        "schema": "cko.ibs.sco-log.v1", "scanner_version": __version__,
+        "sco_addresses": bus_connection.sco_addresses,
+        "note": "Belegung nach Flow v3/KNXUltimate; Priorität bei der Sperre ist eine Annahme (priority_confirmed=false).",
+        "entries": entries, "sectors": _sector_overview(entries),
+    }
+    return Response(json.dumps(document, ensure_ascii=False, indent=2), media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="sco-mitschnitt-{stamp}.json"'})
 
 
 @app.get("/")

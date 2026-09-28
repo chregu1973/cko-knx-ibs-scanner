@@ -1,0 +1,38 @@
+/* SCO-Objekt: Testmaske, Sperr-Banner, Mitschnitt */
+.sco-note{margin:0 0 18px;padding:13px 16px;border:1px solid #6b4b1c;border-radius:10px;background:#221a0e;color:#ffd9a0;font-size:13px;line-height:1.5}
+.sco-lock-banner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:0 0 18px;padding:14px 16px;border:1px solid var(--red);border-radius:10px;background:#2a1117;color:#ffc2c8;font-size:14px}
+.sco-lock-banner span{display:flex;align-items:center;gap:10px}
+.sco-lock-banner .primary{padding:7px 12px}
+.sco-grid{display:grid;grid-template-columns:.9fr 1.3fr;gap:18px;margin-bottom:18px}
+.sco-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+.sco-form label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px}
+.sco-form .wide{grid-column:1/-1}
+.sco-form input,.sco-form select{width:100%;padding:10px 11px;background:#0c141f;color:#fff;border:1px solid var(--line);border-radius:8px;font-size:14px}
+.sco-form label.check,.sco-confirm{flex-direction:row;align-items:center;gap:9px;color:#dce4ee;font-size:13px}
+.sco-form label.check input,.sco-confirm input{width:auto;margin:0}
+.sco-form [hidden],.sco-form label[hidden]{display:none}
+.field-hint{margin:4px 0 0;color:var(--muted);font-size:12px;line-height:1.45}
+.sco-mode{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.sco-mode button{padding:9px 13px;border:1px solid var(--line);border-radius:8px;background:#0c141f;color:#dce4ee;cursor:pointer;font-size:13px}
+.sco-mode button.active{border-color:#8d2632;background:linear-gradient(90deg,#4b1720,#241820);color:#fff}
+.sco-mode button[data-sco-mode="safety"]{border-color:#6b4b1c}
+.sco-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:16px}
+.panel-heading .sco-actions{margin-top:0}
+.sco-preview{margin-top:16px;display:grid;gap:14px}
+.sco-step{padding:14px;border:1px solid var(--line);border-radius:10px;background:#0c141f}
+.sco-step h3{margin:0 0 10px;font-size:14px}
+.sco-step .monitor-table{margin-bottom:10px}
+.sco-assumed{margin-left:4px;padding:2px 6px;border:1px solid #8a6424;border-radius:10px;color:#ffd48a;font-size:10px}
+.sco-match{margin-left:6px;padding:2px 7px;border-radius:10px;background:#10261e;color:#70e5ae;font-size:11px;font-weight:700}
+.sco-protected td{background:#211017}
+.sco-suggestions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;color:var(--muted)}
+.secondary.compact{padding:6px 9px;font-size:12px}
+.secondary-link{color:#7fc2ff;font-size:13px;text-decoration:none;padding:9px 6px}
+.sco-capture{margin-bottom:18px}
+.nav-item.sco-locked{border-color:var(--red);box-shadow:inset 3px 0 var(--orange)}
+@media(max-width:1250px){.sco-grid{grid-template-columns:1fr}}
+@media(max-width:700px){.sco-form{grid-template-columns:1fr}}
+/* hidden-Attribut gegen display:grid/flex durchsetzen */
+.sco-form[hidden],.sco-lock-banner[hidden],.sco-preview[hidden]{display:none}
+.sco-table td{vertical-align:top}.sco-table .monitor-raw{white-space:nowrap}
+.sco-table td:nth-child(3){min-width:0;white-space:nowrap}.sco-table td:nth-child(4){min-width:170px;white-space:normal}

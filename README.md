@@ -3,6 +3,17 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 0.9.0 – SCO-Objekt (6 Byte)
+
+Neue Seite **SCO-Objekt** für das proprietäre SCO-Objekt (6 Byte, «SunControl Object»):
+
+- **Testmaske:** Gruppenadresse, einzelner Sektor (1–512) oder Sektorgruppe; Beschattungsposition (obere/untere Endlage, Fixposition P1–P4) mit Grenz-, Automatik- oder Prioritätsbefehl; lokale oder Gruppenbedienung; Rohtelegramm (Replay aus dem Mitschnitt).
+- **Sicherheit für den Sektor:** Setzen = Fahrbefehl mit Warn-, Sicherheits- oder Gefahrenpriorität + Sperre aktiv; Aufheben = Sperre passiv mit gleicher Priorität und Sperrart. Nur nach ausdrücklicher Freigabe. Ein Banner zeigt von hier gesetzte Sperren mit «Aufheben», bis sie gelöscht sind.
+- Jede Sendung erst nach **Vorschau** (Hex und Klartext) und Bestätigung; gesendet wird als GroupValueWrite mit genau 6 Datenbyte über die bestehende KNX-Verbindung.
+- **Mitschnitt und Datenauflösung:** SCO-Telegramme auf markierten GAs und auf GAs ohne Standard-DPT werden dekodiert (Sektor, Befehl, Priorität, Aktion, P1–P4). «= Vorschau» markiert Byte-gleiche Telegramme – so lassen sich eigene Befehle mit denen der Beschattungszentrale (z. B. im Simulationsbetrieb) vergleichen.
+- **Sektorübersicht** je GA, Sektor und Quelle mit Befehlen und Prioritäten; Export des Mitschnitts als JSON oder CSV.
+- Belegung nach Flow v3 (hbTec) und KNXUltimate `dpt60001`, **am Bus noch nicht bestätigt**. Die Lage der Priorität bei der Sperre (P1 Bit 5–7) ist eine Annahme und wird als solche angezeigt.
+
 ## Version 0.8.2
 
 Version 0.8.2 verhindert veraltete WebView-Inhalte nach einem Update. Die Oberfläche wird immer aus der aktuell installierten Version geladen; die Versionsnummer bleibt direkt in der Sidebar sichtbar.
