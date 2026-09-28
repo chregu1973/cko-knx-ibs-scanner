@@ -95,7 +95,7 @@ async function scoBuildPreview() {
       let spec;
       let allowProtected = false;
       if (scoMode === "drive") spec = {...target, drive: byId("sco-drive").value, position: Number(byId("sco-position").value), priority: byId("sco-priority").value};
-      if (scoMode === "operation") spec = {...target, operation: byId("sco-operation").value, automatic_lock: byId("sco-local").checked};
+      if (scoMode === "operation") spec = {...target, operation: byId("sco-operation").value, automatic_lock: byId("sco-local").value === "1"};
       if (scoMode === "raw") { spec = {hex: byId("sco-raw").value}; allowProtected = byId("sco-raw-allow-protected").checked; }
       const result = await scoApi("/api/sco/encode", {method: "POST", body: JSON.stringify({spec, allow_protected: allowProtected})});
       steps = [{key: "single", label: "Telegramm", button: "Senden", frames: [result]}];

@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>CKO KNX IBS Scanner</title>
     <link rel="icon" href="/static/cko-toolbox-logo.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=0.9.3" />
-    <link rel="stylesheet" href="/static/connection.css?v=0.9.3" />
-    <link rel="stylesheet" href="/static/branding.css?v=0.9.3" />
-    <link rel="stylesheet" href="/static/sco.css?v=0.9.3" />
+    <link rel="stylesheet" href="/static/styles.css?v=1.0.0" />
+    <link rel="stylesheet" href="/static/connection.css?v=1.0.0" />
+    <link rel="stylesheet" href="/static/branding.css?v=1.0.0" />
+    <link rel="stylesheet" href="/static/sco.css?v=1.0.0" />
   </head>
   <body>
     <aside class="sidebar">
@@ -21,7 +21,7 @@
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
       </nav>
-      <div class="sidebar-version"><span>Installierte Version</span><strong>KNX IBS Scanner 0.9.3</strong></div>
+      <div class="sidebar-version"><span>Installierte Version</span><strong>KNX IBS Scanner 1.0.0</strong></div>
       <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
       <a class="return-button" href="https://toolbox.ckoeppen.ch/">← Zurück zur Toolbox</a>
     </aside>
@@ -167,7 +167,7 @@
           <div class="header-actions"><span id="sco-connection-badge" class="badge muted">○ Nicht verbunden</span><span id="sco-monitor-badge" class="badge muted">○ Mitschnitt aus</span></div>
         </header>
         <div id="sco-lock-banner" class="sco-lock-banner" hidden></div>
-        <section class="sco-note"><strong>Hinweis:</strong> Fahrbefehl, Bedienung und Sicherheit (Fahrbefehlssperre, Lokalbedienung) sind am Bus mit einer Zentrale und der ETS-App geprüft. Eigene Sicherheitsbefehle trotzdem zuerst an einer Simulation oder einem Testsektor ausprobieren. Die Beschattungszentrale kann Testbefehle mit ihrer Automatik übersteuern. Zuerst mit der Simulation der Zentrale oder einem Testsektor prüfen.</section>
+        <section class="sco-note"><strong>Hinweis:</strong> Fahrbefehle, Lokalbedienung und Sicherheit (Fahrbefehlssperre, Lokalbedienung) sind am Bus mit einer Zentrale und der ETS-App geprüft. Eigene Sicherheitsbefehle trotzdem zuerst an einer Simulation oder einem Testsektor ausprobieren. Die Beschattungszentrale kann Testbefehle mit ihrer Automatik übersteuern. Zuerst mit der Simulation der Zentrale oder einem Testsektor prüfen.</section>
         <div class="sco-grid">
           <section class="panel">
             <div class="panel-heading"><h2>1 · Ziel</h2></div>
@@ -203,7 +203,7 @@
             </div>
             <div class="sco-form" data-mode="operation" hidden>
               <label>Lokalbedienung<select id="sco-operation"><option>lang auf</option><option>lang ab</option><option>kurz auf</option><option>kurz ab</option><option selected>Stopp</option><option>lang-kurz auf</option><option>lang-kurz ab</option></select></label>
-              <label class="check"><input id="sco-local" type="checkbox" checked /> Mit Automatiksperre setzen (ohne: noch nicht am Bus geprüft)</label>
+              <label>Automatiksperre<select id="sco-local"><option value="1" selected>setzen</option><option value="0">löschen</option></select></label>
             </div>
             <div class="sco-form" data-mode="safety" hidden>
               <label>Priorität<select id="sco-safety-priority"><option value="sicherheit">Sicherheitsbefehl</option><option value="warn">Warnbefehl</option><option value="gefahr">Gefahrenbefehl</option></select></label>
@@ -254,7 +254,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/app.js?v=0.9.3"></script>
-    <script src="/static/sco.js?v=0.9.3"></script>
+    <script src="/static/app.js?v=1.0.0"></script>
+    <script src="/static/sco.js?v=1.0.0"></script>
   </body>
 </html>

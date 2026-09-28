@@ -66,7 +66,7 @@ def test_every_operation_round_trips() -> None:
                 result = decode(data)
                 assert result["target"] == f"Sektor {sector}"
                 name = sco.OPERATION_NAMES[sco.OPERATION.index(operation)]
-                assert result["action"] == f"{name} · {'mit Automatiksperre setzen' if local else 'ohne Automatiksperre'}"
+                assert result["action"] == f"{name} · {'mit Automatiksperre setzen' if local else 'mit Automatiksperre löschen'}"
 
 
 def test_protected_priorities_are_blocked_unless_released() -> None:
@@ -267,6 +267,11 @@ GPA_REFERENCE = [
     ("01 14 80 00 00 00", None, "Lang Auf · mit Automatiksperre setzen"),
     ("01 14 82 00 00 00", None, "Kurz Auf · mit Automatiksperre setzen"),
     ("01 14 84 00 00 00", None, "Stopp · mit Automatiksperre setzen"),
+    ("01 14 04 00 00 00", None, "Stopp · mit Automatiksperre löschen"),
+    ("01 14 00 00 00 00", None, "Lang Auf · mit Automatiksperre löschen"),
+    ("01 04 25 00 00 00", "Automatikbefehl", "Wipp Auf · Wippdauer vom Aktor"),
+    ("01 04 26 00 00 00", "Automatikbefehl", "Wipp Ab · Wippdauer vom Aktor"),
+    ("01 04 27 00 00 00", "Automatikbefehl", "Stopp"),
 ]
 
 

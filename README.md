@@ -3,6 +3,15 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.0.0
+
+Erste stabile Version mit SCO-Objekt. Alle sendbaren Befehle sind am Bus mit einer Beschattungszentrale und der ETS-App geprüft (28.09.2026):
+
+- **Fahrbefehle:** obere/untere Endlage, Beschattungsposition P1–P4, Wipp Auf/Ab (Wippdauer vom Aktor), Stopp – mit Grenz-, Automatik- oder Prioritätsbefehl.
+- **Lokalbedienung:** Lang/Kurz Auf/Ab, Stopp, Lang-Kurz; Bit 7 = Automatiksperre setzen (1) oder löschen (0). Die bisherige Deutung lokal/Gruppe stammte aus KNXUltimate und war falsch.
+- **Sicherheit:** Setzen = Sperre (Lokalbedienung und/oder Fahrbefehlssperre, P1 = betroffene, P2 = gesetzte Sperren), danach Fahrbefehl mit Warn-, Sicherheits- oder Gefahrenpriorität; Aufheben = beide Sperren einzeln löschen.
+- **Dekodierung** wie die ETS-App, abgesichert mit Referenztests aus deren Protokoll; Export in den Downloads-Ordner; Programmfenster schliesst beim Beenden.
+
 ## Version 0.9.3
 
 - **Dekodierung nach der ETS-App (GPA) abgeglichen:** Wipp Auf/Ab (Wippdauer vom Aktor) und Stopp als Fahrbefehle, «Lokalbedienung sperren/freigeben», Lamellenwinkel-Korrekturfaktor, «Grenzen Sicherheit», «Grenzen Sicherheit/Automatik Lokalbedienung», Busüberwachung aktiv/inaktiv.

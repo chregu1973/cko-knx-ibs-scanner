@@ -10,8 +10,8 @@ Belegung nach Flow v3 (hbTec, 28.09.2026), KNXUltimate ``dpt60001`` und KNX-User
   Priorität; P2 = Maske der gesetzten Sperren, 0 = löschen (Mitschnitt und ETS-App, 28.09.2026).
 * Sicherheit wie die Zentrale: zuerst Sperre setzen, dann Fahrbefehl mit Warn-/Sicherheits-/
   Gefahrenpriorität; Aufheben = Fahrbefehlssperre und Tastensperre einzeln löschen.
-* Lokalbedienung (5): P1 Bit 0–6 Bedienart, Bit 7 = «mit Automatiksperre setzen» (ETS-App, 28.09.2026;
-  KNXUltimate deutet Bit 7 als lokal/Gruppe).
+* Lokalbedienung (5): P1 Bit 0–6 Bedienart, Bit 7 = 1 Automatiksperre setzen / 0 Automatiksperre löschen
+  (ETS-App, 28.09.2026; KNXUltimate deutet Bit 7 als lokal/Gruppe).
 
 Das Objekt ist kein KNX-Standard-Datenpunkt. Unbekannte Werte werden roh gemeldet, nie geraten.
 """
@@ -203,7 +203,7 @@ def _action(command: int, data: bytes) -> str:
     if command == 5:
         operation = data[2] & 0x7F
         name = OPERATION_NAMES[operation] if operation < len(OPERATION_NAMES) else f"unbekannt ({operation})"
-        return f"{name} · {'mit Automatiksperre setzen' if data[2] & 0x80 else 'ohne Automatiksperre'}"
+        return f"{name} · {'mit Automatiksperre setzen' if data[2] & 0x80 else 'mit Automatiksperre löschen'}"
     if command == 11:
         return "inaktiv" if not any(data[2:]) else f"Werte {data[2]:02X} {data[3]:02X} {data[4]:02X} {data[5]:02X}"
     if command in {16, 17, 19, 20, 22, 23, 24}:
