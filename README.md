@@ -3,10 +3,13 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 0.9.2
+
+- **Export JSON/CSV** speichert den Mitschnitt direkt im **Downloads-Ordner** des angemeldeten Benutzers (auch bei verschobenem Downloads-Ordner). Der Pfad wird angezeigt, «Im Explorer anzeigen» markiert die Datei. Das Programmfenster blockiert Browser-Downloads, deshalb speichert der lokale Dienst die Datei selbst.
+
 ## Version 0.9.1
 
 - **Sicherheit wie die Zentrale:** Nach einem Mitschnitt einer Beschattungszentrale korrigiert. Die Sperre trägt keine Priorität (P1 = Sperrart, P2 = 02 zum Setzen, 00 zum Löschen). Setzen = Sperre, danach Fahrbefehl mit Warn-, Sicherheits- oder Gefahrenpriorität; Aufheben = Fahrbefehlssperre und Tastensperre einzeln löschen. Die Telegramme der Zentrale werden Byte für Byte nachgebildet.
-- **Export JSON/CSV** funktioniert jetzt im Windows-Programmfenster über den Dialog «Speichern unter».
 - Am Bus mit der ETS-App geprüft: Fahrbefehl (Sektor, Priorität, Fixposition) und lokale Bedienung.
 
 ## Version 0.9.0 – SCO-Objekt (6 Byte)

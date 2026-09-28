@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import subprocess
+import sys
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
@@ -408,30 +411,96 @@ async def sco_sectors() -> dict:
     return {"sectors": _sector_overview(list(bus_connection.sco_log))}
 
 
-@app.get("/api/sco/export")
-async def sco_export(format: str = "json") -> Response:
+def _sco_export_content(format: str) -> tuple[str, str, str]:
+    """Dateiname, Inhalt und Medientyp des Mitschnitts."""
     entries = list(bus_connection.sco_log)
     stamp = entries[-1]["time"][:19].replace(":", "-") if entries else "leer"
     if format == "csv":
         columns = ["time", "direction", "origin", "source", "destination", "group_name", "hex", "target",
-                   "command", "priority", "priority_confirmed", "action", "lock_active", "p1", "p2", "p3", "p4"]
+                   "command", "priority", "action", "lock_active", "p1", "p2", "p3", "p4"]
         lines = [";".join(columns)]
         for entry in entries:
             row = {**entry, **entry["decoded"]}
             lines.append(";".join(str(row.get(column, "") if row.get(column) is not None else "").replace(";", ",")
                                   for column in columns))
-        return Response("\ufeff"+"\n".join(lines)+"\n", media_type="text/csv",
-                        headers={"Content-Disposition": f'attachment; filename="sco-mitschnitt-{stamp}.csv"'})
+        return f"sco-mitschnitt-{stamp}.csv", "\ufeff"+"\n".join(lines)+"\n", "text/csv"
     if format != "json":
         raise HTTPException(status_code=400, detail="Format muss json oder csv sein.")
     document = {
         "schema": "cko.ibs.sco-log.v1", "scanner_version": __version__,
         "sco_addresses": bus_connection.sco_addresses,
-        "note": "Belegung nach Flow v3/KNXUltimate; Priorität bei der Sperre ist eine Annahme (priority_confirmed=false).",
+        "note": "Belegung nach Flow v3/KNXUltimate und Mitschnitt einer Beschattungszentrale.",
         "entries": entries, "sectors": _sector_overview(entries),
     }
-    return Response(json.dumps(document, ensure_ascii=False, indent=2), media_type="application/json",
-                    headers={"Content-Disposition": f'attachment; filename="sco-mitschnitt-{stamp}.json"'})
+    return f"sco-mitschnitt-{stamp}.json", json.dumps(document, ensure_ascii=False, indent=2), "application/json"
+
+
+def downloads_dir() -> Path:
+    """Downloads-Ordner des angemeldeten Benutzers (auch wenn er unter Windows verschoben wurde)."""
+    override = os.getenv("CKO_IBS_EXPORT_DIR")
+    if override:
+        return Path(override)
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            from uuid import UUID
+
+            guid = (ctypes.c_byte * 16).from_buffer_copy(UUID("374DE290-123F-4565-9164-39C4925E467B").bytes_le)
+            path_pointer = wintypes.LPWSTR()
+            if ctypes.windll.shell32.SHGetKnownFolderPath(guid, 0, None, ctypes.byref(path_pointer)) == 0:
+                folder = Path(path_pointer.value)
+                ctypes.windll.ole32.CoTaskMemFree(path_pointer)
+                return folder
+        except (AttributeError, OSError, ValueError):
+            pass
+    folder = Path.home() / "Downloads"
+    return folder if folder.is_dir() else Path.home()
+
+
+class SCOExportRequest(BaseModel):
+    format: str = "json"
+
+
+class SCORevealRequest(BaseModel):
+    path: str
+
+
+@app.get("/api/sco/export")
+async def sco_export(format: str = "json") -> Response:
+    filename, content, media_type = _sco_export_content(format)
+    return Response(content, media_type=media_type,
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@app.post("/api/sco/export/save")
+async def sco_export_save(request: SCOExportRequest) -> dict:
+    """Mitschnitt direkt im Downloads-Ordner speichern (das Programmfenster blockiert Browser-Downloads)."""
+    filename, content, _ = _sco_export_content(request.format)
+    folder = downloads_dir()
+    target = folder / filename
+    counter = 2
+    while target.exists():
+        target = folder / f"{Path(filename).stem}-{counter}{Path(filename).suffix}"
+        counter += 1
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8", newline="")
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Datei konnte nicht gespeichert werden: {exc}") from exc
+    return {"path": str(target), "folder": str(folder), "filename": target.name}
+
+
+@app.post("/api/sco/export/reveal")
+def sco_export_reveal(request: SCORevealRequest) -> dict:
+    """Gespeicherte Exportdatei im Windows-Explorer markieren."""
+    target = Path(request.path).resolve()
+    if target.parent != downloads_dir().resolve() or not target.is_file() or not target.name.startswith("sco-mitschnitt-"):
+        raise HTTPException(status_code=400, detail="Nur eigene Exportdateien im Downloads-Ordner können angezeigt werden.")
+    if sys.platform != "win32":
+        return {"opened": False, "path": str(target)}
+    subprocess.Popen(["explorer", f"/select,{target}"])
+    return {"opened": True, "path": str(target)}
 
 
 @app.get("/")

@@ -238,28 +238,15 @@ byId("sco-sectors-button").addEventListener("click", renderSCOSectors);
 async function scoExport(format) {
   const message = byId("sco-export-message");
   message.className = "message";
-  message.textContent = "Export wird erstellt …";
+  message.textContent = "Export wird gespeichert …";
   try {
-    const response = await fetch(`/api/sco/export?format=${format}`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const content = await response.text();
-    const filename = (response.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1] || `sco-mitschnitt.${format}`;
-    if (window.pywebview?.api?.save_text) {
-      // Windows-Programmfenster: nativer Dialog «Speichern unter»
-      const result = await window.pywebview.api.save_text(filename, content);
-      if (result?.saved) message.textContent = `Gespeichert: ${result.path}`;
-      else if (result?.cancelled) message.textContent = "Speichern abgebrochen.";
-      else throw new Error(result?.error || "Speichern fehlgeschlagen");
-      return;
-    }
-    const link = document.createElement("a");   // Browser: normaler Download
-    link.href = URL.createObjectURL(new Blob([content], {type: format === "csv" ? "text/csv" : "application/json"}));
-    link.download = filename;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(link.href), 5000);
-    message.textContent = `Download gestartet: ${filename}`;
+    // Der lokale Dienst speichert direkt im Downloads-Ordner; das Programmfenster blockiert Browser-Downloads.
+    const result = await scoApi("/api/sco/export/save", {method: "POST", body: JSON.stringify({format})});
+    message.innerHTML = `Gespeichert im Downloads-Ordner: <strong>${escapeHtml(result.path)}</strong> <button type="button" class="secondary compact" id="sco-reveal-button">Im Explorer anzeigen</button>`;
+    byId("sco-reveal-button").addEventListener("click", async () => {
+      const opened = await scoApi("/api/sco/export/reveal", {method: "POST", body: JSON.stringify({path: result.path})}).catch((error) => ({error}));
+      if (opened.error || !opened.opened) message.insertAdjacentText("beforeend", " – Explorer konnte nicht geöffnet werden, bitte den Pfad oben verwenden.");
+    });
   } catch (error) {
     message.className = "message error";
     message.textContent = `Export fehlgeschlagen: ${error.message}`;

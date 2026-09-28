@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -227,3 +228,21 @@ def test_sending_uses_six_byte_group_value_write(monkeypatch) -> None:
     assert items[0]["source"] == "1.12.252" and items[0]["origin"] == "IBS-Test: Sicherheit setzen"
     bus_connection.sco_log.clear()
     bus_connection.set_sco_addresses([])
+
+
+def test_export_is_saved_in_downloads_folder(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CKO_IBS_EXPORT_DIR", str(tmp_path))
+    bus_connection.sco_log.clear()
+    bus_connection._on_telegram(_incoming("10/0/10", bytes.fromhex("011002020000"), "1.1.2"))
+    first = client.post("/api/sco/export/save", json={"format": "json"}).json()
+    second = client.post("/api/sco/export/save", json={"format": "json"}).json()
+    assert first["folder"] == str(tmp_path) and first["path"] != second["path"]
+    assert second["filename"].endswith("-2.json")
+    document = json.loads((tmp_path / first["filename"]).read_text(encoding="utf-8"))
+    assert document["entries"][0]["decoded"]["action"] == "Tastensperre setzen"
+    csv_file = client.post("/api/sco/export/save", json={"format": "csv"}).json()
+    assert "01 10 02 02 00 00" in (tmp_path / csv_file["filename"]).read_text(encoding="utf-8-sig")
+    assert client.post("/api/sco/export/save", json={"format": "xml"}).status_code == 400
+    assert client.post("/api/sco/export/reveal", json={"path": first["path"]}).json()["opened"] is False  # kein Windows
+    assert client.post("/api/sco/export/reveal", json={"path": "/etc/passwd"}).status_code == 400
+    bus_connection.sco_log.clear()

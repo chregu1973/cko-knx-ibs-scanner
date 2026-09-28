@@ -91,28 +91,6 @@ class DesktopApi:
         threading.Thread(target=shutdown_watchdog, name="cko-ibs-close-watchdog", daemon=True).start()
         return True
 
-    def save_text(self, filename: str, content: str) -> dict[str, Any]:
-        """Export über den Windows-Dialog «Speichern unter» (WebView2 ignoriert Download-Links)."""
-        import webview
-
-        window = self.window
-        if window is None:
-            return {"saved": False, "error": "Kein Programmfenster vorhanden."}
-        name = Path(str(filename)).name or "export.txt"
-        suffix = Path(name).suffix.lower()
-        file_types = {".json": ("JSON-Datei (*.json)",), ".csv": ("CSV-Datei (*.csv)",)}.get(suffix, ("Alle Dateien (*.*)",))
-        dialog = getattr(getattr(webview, "FileDialog", None), "SAVE", None) or webview.SAVE_DIALOG
-        try:
-            selection = window.create_file_dialog(dialog, save_filename=name, file_types=file_types)
-        except Exception as exc:
-            LOGGER.exception("Speichern-Dialog konnte nicht geöffnet werden")
-            return {"saved": False, "error": str(exc)}
-        if not selection:
-            return {"saved": False, "cancelled": True}
-        target = Path(selection if isinstance(selection, str) else selection[0])
-        target.write_text(content, encoding="utf-8", newline="")
-        return {"saved": True, "path": str(target)}
-
 
 def _run_desktop_window(url: str, stop_server: Callable[[], None] | None = None) -> None:
     import webview
