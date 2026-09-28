@@ -260,6 +260,7 @@ GPA_REFERENCE = [
     ("01 10 02 02 00 00", None, "Lokalbedienung sperren"),
     ("01 10 02 00 00 00", None, "Lokalbedienung freigeben"),
     ("01 10 01 00 00 00", None, "Fahrbefehlssperre löschen"),
+    ("01 10 01 01 00 00", None, "Fahrbefehlssperre setzen"),
     ("01 08 00 14 00 00", None, "Lamellenwinkel: Korrekturfaktor 100 %"),
     ("01 2C 00 00 00 00", None, "inaktiv"),
 ]

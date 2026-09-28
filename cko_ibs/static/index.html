@@ -167,7 +167,7 @@
           <div class="header-actions"><span id="sco-connection-badge" class="badge muted">○ Nicht verbunden</span><span id="sco-monitor-badge" class="badge muted">○ Mitschnitt aus</span></div>
         </header>
         <div id="sco-lock-banner" class="sco-lock-banner" hidden></div>
-        <section class="sco-note"><strong>Hinweis:</strong> Fahrbefehl und Bedienung sind am Bus geprüft. Der Sicherheitsablauf bildet die Telegramme einer Zentrale Byte für Byte nach; eigene Sicherheitsbefehle zuerst an einer Simulation oder einem Testsektor prüfen. Die Beschattungszentrale kann Testbefehle mit ihrer Automatik übersteuern. Zuerst mit der Simulation der Zentrale oder einem Testsektor prüfen.</section>
+        <section class="sco-note"><strong>Hinweis:</strong> Fahrbefehl, Bedienung und Sicherheit (Fahrbefehlssperre, Lokalbedienung) sind am Bus mit einer Zentrale und der ETS-App geprüft. Eigene Sicherheitsbefehle trotzdem zuerst an einer Simulation oder einem Testsektor ausprobieren. Die Beschattungszentrale kann Testbefehle mit ihrer Automatik übersteuern. Zuerst mit der Simulation der Zentrale oder einem Testsektor prüfen.</section>
         <div class="sco-grid">
           <section class="panel">
             <div class="panel-heading"><h2>1 · Ziel</h2></div>
@@ -209,7 +209,7 @@
               <label>Priorität<select id="sco-safety-priority"><option value="sicherheit">Sicherheitsbefehl</option><option value="warn">Warnbefehl</option><option value="gefahr">Gefahrenbefehl</option></select></label>
               <label>Fahren auf<select id="sco-safety-drive"><option value="oben">Obere Endlage</option><option value="unten">Untere Endlage</option><option value="fix">Beschattungsposition</option><option value="keine">Keine Fahrbewegung</option></select></label>
               <label>Beschattungsposition<select id="sco-safety-position"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
-              <label>Sperre<select id="sco-lock"><option value="taste" selected>Lokalbedienung sperren (wie Zentrale)</option><option value="fahrbefehl">Fahrbefehlssperre – noch nicht bestätigt</option><option value="beide">Beide einzeln – Fahrbefehlssperre noch nicht bestätigt</option></select></label>
+              <label>Sperre<select id="sco-lock"><option value="taste" selected>Lokalbedienung sperren (wie Zentrale)</option><option value="fahrbefehl">Fahrbefehlssperre</option><option value="beide">Fahrbefehlssperre und Lokalbedienung (einzeln)</option></select></label>
               <label class="check wide"><input id="sco-allow-protected" type="checkbox" /> Sicherheitsbefehle freigeben – ich teste an der Simulation der Zentrale oder einem Testsektor</label>
               <p class="field-hint wide">Ablauf wie die Zentrale: Setzen = Lokalbedienung sperren, danach Fahrbefehl mit gewählter Priorität. Aufheben = Fahrbefehlssperre löschen und Lokalbedienung freigeben.</p>
             </div>

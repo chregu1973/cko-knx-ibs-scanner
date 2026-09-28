@@ -41,7 +41,7 @@ DRIVE_NAMES = {0: "keine Fahrbewegung", 1: "obere Endlage", 2: "untere Endlage",
 OPERATION = ["lang auf", "lang ab", "kurz auf", "kurz ab", "Stopp", "lang-kurz auf", "lang-kurz ab"]
 # Sperre: P1 = Maske der betroffenen Sperren, P2 = Maske der zu setzenden Sperren (0 = löschen).
 # Bestätigt: 02/02 Lokalbedienung sperren, 02/00 freigeben, 01/00 Fahrbefehlssperre löschen.
-# 01/02 meldet die ETS-App als «Sperre: unbekannt»; 01/01 zum Setzen folgt daraus, ist aber noch zu bestätigen.
+# 01/02 meldet die ETS-App als «Sperre: unbekannt»; 01/01 = Fahrbefehlssperre setzen (bestätigt 28.09.2026).
 LOCKS = {"fahrbefehl": 1, "taste": 2, "beide": 3}
 LOCK_BITS = {1: "Fahrbefehlssperre", 2: "Lokalbedienung"}
 LOCK_ACTIONS = {(1, True): "Fahrbefehlssperre setzen", (1, False): "Fahrbefehlssperre löschen",
