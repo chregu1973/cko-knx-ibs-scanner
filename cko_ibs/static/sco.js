@@ -91,6 +91,9 @@ async function scoBuildPreview() {
         {key: "set", label: "Sicherheit setzen", button: "Sicherheit setzen", frames: pair.set},
         {key: "release", label: "Sicherheit aufheben", button: "Sicherheit aufheben", frames: pair.release},
       ];
+    } else if (scoMode === "release") {
+      const result = await scoApi("/api/sco/release", {method: "POST", body: JSON.stringify({spec: {...target, lock: byId("sco-release-lock").value}})});
+      steps = [{key: "release", label: "Freigabe", button: "Freigeben", frames: result.release}];
     } else {
       let spec;
       let allowProtected = false;

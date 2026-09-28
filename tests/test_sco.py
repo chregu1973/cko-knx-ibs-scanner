@@ -299,3 +299,24 @@ def test_lock_masks_and_invalid_combination() -> None:
                                                   ("stopp", "01 04 67 00 00 00")])
 def test_new_drive_masks_reproduce_central_telegrams(drive, expected) -> None:
     assert sco.to_hex(encode({"sector": 1, "drive": drive, "priority": "prioritaet"})) == expected
+
+
+def test_simple_release_matches_central_controller() -> None:
+    """Freigabe der Zentrale (Mitschnitt 28.09.2026, 23:09:50): nur Sperren löschen, kein Fahrbefehl."""
+    frames = sco.release_sequence({"sector": 1})
+    assert [sco.to_hex(frame) for frame in frames] == ["01 10 01 00 00 00", "01 10 02 00 00 00"]
+    assert [sco.to_hex(frame) for frame in sco.release_sequence({"sector": 1, "lock": "taste"})] == ["01 10 02 00 00 00"]
+    assert [decode(frame)["action"] for frame in sco.release_sequence({"sector": 12, "lock": "fahrbefehl"})] == [
+        "Fahrbefehlssperre löschen"]
+    assert not any(decode(frame)["protected"] for frame in frames)
+    with pytest.raises(SCOError):
+        sco.release_sequence({"sector": 1, "lock": "alle"})
+
+
+def test_release_api_and_sending_without_safety_release() -> None:
+    result = client.post("/api/sco/release", json={"spec": {"sector": 1, "lock": "beide"}}).json()
+    assert [item["hex"] for item in result["release"]] == ["01 10 01 00 00 00", "01 10 02 00 00 00"]
+    # Ohne Verbindung 409 (nicht 400): die Freigabe scheitert nicht an der Sicherheitsprüfung
+    response = client.post("/api/sco/send", json={"group_address": "10/0/10", "confirmed": True,
+                                                   "frames": [item["hex"] for item in result["release"]]})
+    assert response.status_code == 409

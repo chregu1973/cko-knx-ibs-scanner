@@ -166,8 +166,20 @@ def safety_sequence(spec: dict[str, Any]) -> dict[str, list[bytes]]:
     locks = [encode({**target, "lock": part, "active": True}, allow_protected=True) for part in LOCK_PARTS[lock_kind]]
     drive = encode({**target, "drive": spec.get("drive", "oben"), "position": spec.get("position", 0),
                     "priority": spec["priority"]}, allow_protected=True)
-    release = [encode({**target, "lock": part, "active": False}) for part in ("fahrbefehl", "taste")]
-    return {"set": [*locks, drive], "release": release}
+    return {"set": [*locks, drive], "release": release_sequence({**target, "lock": "beide"})}
+
+
+def release_sequence(spec: dict[str, Any]) -> list[bytes]:
+    """Einfache Freigabe wie die Zentrale: nur die Sperren löschen, ohne Fahrbefehl.
+
+    spec: {"sector"|"group", "lock": "beide" (Standard, wie die Zentrale)|"fahrbefehl"|"taste"}
+    Sperren löschen verriegelt nichts und braucht deshalb keine Freigabe für Sicherheitsbefehle.
+    """
+    lock_kind = spec.get("lock", "beide")
+    if lock_kind not in LOCK_PARTS:
+        raise SCOError("Sperrart muss beide, fahrbefehl oder taste sein")
+    target = {key: spec[key] for key in ("sector", "group") if key in spec}
+    return [encode({**target, "lock": part, "active": False}) for part in LOCK_PARTS[lock_kind]]
 
 
 def _is_protected(data: bytes) -> bool:
