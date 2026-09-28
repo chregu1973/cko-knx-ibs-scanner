@@ -6,8 +6,8 @@ Belegung nach Flow v3 (hbTec, 28.09.2026), KNXUltimate ``dpt60001`` und KNX-User
   das tiefste gesetzte Bit gibt die Gruppengrösse an.
 * Byte 1, Bit 2–7: Command. Byte 2–5: Parameter P1–P4.
 * Fahrbefehl (1): P1 Bit 5–7 Priorität, Bit 0–4 Funktion; P2 Fixposition 1–4.
-* Sperre (4): P1 = Sperrart (1 Fahrbefehlssperre, 2 Tastensperre), keine Priorität; P2 = 0 Sperre
-  löschen (passiv), sonst setzen (aktiv). Die Zentrale setzt mit P2 = 02 (Mitschnitt vom 28.09.2026).
+* Sperre (4): P1 = Maske der betroffenen Sperren (1 Fahrbefehlssperre, 2 Lokalbedienung), keine
+  Priorität; P2 = Maske der gesetzten Sperren, 0 = löschen (Mitschnitt und ETS-App, 28.09.2026).
 * Sicherheit wie die Zentrale: zuerst Sperre setzen, dann Fahrbefehl mit Warn-/Sicherheits-/
   Gefahrenpriorität; Aufheben = Fahrbefehlssperre und Tastensperre einzeln löschen.
 * Bedienung (5): P1 Bit 7 lokal (1) / Gruppe (0), Bit 0–6 Bedienart.
@@ -24,9 +24,10 @@ COMMANDS = {
     1: "Fahrbefehl", 2: "Wertkorrektur", 3: "Automatikzustand", 4: "Sperre setzen/löschen",
     5: "Bedienung", 6: "Szene setzen", 7: "Spezialbefehl", 8: "Datum", 9: "Zeit synchronisieren",
     10: "Sensorwert-Meldung", 11: "Busüberwachung",
-    16: "Fahrbereichsgrenzen Sicherheitsfahrbefehle", 17: "Fahrbereichsgrenzen Sicherheitsfahrbefehle",
-    19: "Fahrbereichsgrenzen Sicherheitsfahrbefehle", 20: "Fahrbereichsgrenzen Sicherheitsfahrbefehle",
-    22: "Fahrbereichsgrenzen Automatikfahrbefehle", 23: "Fahrbereichsgrenzen Automatikfahrbefehle",
+    # 16, 19 und 22 sind mit der ETS-App bestätigt; 17, 20, 23 und 24 nach KNXUltimate
+    16: "Grenzen Sicherheit", 17: "Fahrbereichsgrenzen Sicherheitsfahrbefehle",
+    19: "Grenzen Sicherheit Lokalbedienung", 20: "Fahrbereichsgrenzen Sicherheitsfahrbefehle",
+    22: "Grenzen Automatik Lokalbedienung", 23: "Fahrbereichsgrenzen Automatikfahrbefehle",
     24: "Fahrbereichsgrenzen Automatikfahrbefehle",
 }
 PRIORITIES = {0: "Grenzbefehl", 1: "Automatikbefehl", 3: "Prioritätsbefehl", 4: "Warnbefehl",
@@ -34,13 +35,17 @@ PRIORITIES = {0: "Grenzbefehl", 1: "Automatikbefehl", 3: "Prioritätsbefehl", 4:
 PRIORITY_KEYS = {"grenz": 0, "automatik": 1, "prioritaet": 3, "warn": 4, "sicherheit": 5, "gefahr": 6}
 # Diese Prioritäten können Storen verriegeln und brauchen eine ausdrückliche Freigabe.
 PROTECTED_PRIORITIES = {4, 5, 6}
-DRIVE = {"keine": 0, "oben": 1, "unten": 2, "fix": 3}
-DRIVE_NAMES = {0: "keine Fahrbewegung", 1: "obere Endlage", 2: "untere Endlage", 3: "Fixposition"}
+DRIVE = {"keine": 0, "oben": 1, "unten": 2, "fix": 3, "wipp_auf": 5, "wipp_ab": 6, "stopp": 7}
+DRIVE_NAMES = {0: "keine Fahrbewegung", 1: "obere Endlage", 2: "untere Endlage", 3: "Beschattungsposition",
+               5: "Wipp Auf · Wippdauer vom Aktor", 6: "Wipp Ab · Wippdauer vom Aktor", 7: "Stopp"}
 OPERATION = ["lang auf", "lang ab", "kurz auf", "kurz ab", "Stopp", "lang-kurz auf", "lang-kurz ab"]
+# Sperre: P1 = Maske der betroffenen Sperren, P2 = Maske der zu setzenden Sperren (0 = löschen).
+# Bestätigt: 02/02 Lokalbedienung sperren, 02/00 freigeben, 01/00 Fahrbefehlssperre löschen.
+# 01/02 meldet die ETS-App als «Sperre: unbekannt»; 01/01 zum Setzen folgt daraus, ist aber noch zu bestätigen.
 LOCKS = {"fahrbefehl": 1, "taste": 2, "beide": 3}
-LOCK_NAMES = {1: "Fahrbefehlssperre", 2: "Tastensperre", 3: "Fahrbefehls- und Tastensperre"}
-# Wert, mit dem die Zentrale eine Sperre setzt (Mitschnitt: 01 10 02 02 00 00 = Tastensperre setzen)
-LOCK_SET_VALUE = 0x02
+LOCK_BITS = {1: "Fahrbefehlssperre", 2: "Lokalbedienung"}
+LOCK_ACTIONS = {(1, True): "Fahrbefehlssperre setzen", (1, False): "Fahrbefehlssperre löschen",
+                (2, True): "Lokalbedienung sperren", (2, False): "Lokalbedienung freigeben"}
 # Sperrarten, die einzeln gesendet werden; «beide» (3) verwendet die Zentrale nicht
 LOCK_PARTS = {"fahrbefehl": ["fahrbefehl"], "taste": ["taste"], "beide": ["fahrbefehl", "taste"]}
 
@@ -117,7 +122,7 @@ def encode(spec: dict[str, Any], allow_protected: bool = False) -> bytes:
         return data
     if "drive" in spec:
         if spec["drive"] not in DRIVE:
-            raise SCOError("Fahrbefehl muss oben, unten, fix oder keine sein")
+            raise SCOError("Fahrbefehl muss oben, unten, fix, wipp_auf, wipp_ab, stopp oder keine sein")
         position = 0
         if spec["drive"] == "fix":
             position = int(spec.get("position", 0))
@@ -131,7 +136,8 @@ def encode(spec: dict[str, Any], allow_protected: bool = False) -> bytes:
         if spec.get("active") and not allow_protected:
             raise SCOError("Eine Sperre setzen ist ein Sicherheitsbefehl und braucht eine ausdrückliche Freigabe")
         byte0, byte1 = _header(spec, 4)
-        return bytes([byte0, byte1, LOCKS[spec["lock"]], LOCK_SET_VALUE if spec.get("active") else 0, 0, 0])
+        mask = LOCKS[spec["lock"]]
+        return bytes([byte0, byte1, mask, mask if spec.get("active") else 0, 0, 0])
     if "operation" in spec:
         if spec["operation"] not in OPERATION:
             raise SCOError(f"Bedienung muss eine von {', '.join(OPERATION)} sein")
@@ -166,26 +172,39 @@ def _is_protected(data: bytes) -> bool:
     if command == 1:
         return data[2] >> 5 in PROTECTED_PRIORITIES
     if command == 4:
-        return data[3] != 0 and data[2] != 0  # Sperre setzen
+        return bool(data[2] & data[3])  # mindestens eine Sperre wird gesetzt
     return False
+
+
+def _lock_action(data: bytes) -> str:
+    affected, active = data[2], data[3]
+    if affected == 0:
+        return "keine Sperre"
+    if affected & ~0x03 or active & ~affected:
+        return f"Sperre unbekannt (P1 {affected:02X}, P2 {active:02X})"
+    return " + ".join(LOCK_ACTIONS[(bit, bool(active & bit))] for bit in (1, 2) if affected & bit)
 
 
 def _action(command: int, data: bytes) -> str:
     if command == 1:
         function = data[2] & 0x1F
         if function == 3:
-            return f"Fixposition P{data[3]}" if 1 <= data[3] <= 4 else f"Fixposition unbekannt ({data[3]})"
+            return f"Beschattungsposition P{data[3]}" if 1 <= data[3] <= 4 else f"Beschattungsposition unbekannt ({data[3]})"
         return DRIVE_NAMES.get(function, f"unbekannter Fahrbefehl ({function})")
-    if command == 4:
+    if command == 2:
         if data[2] == 0:
-            return "keine Sperre"
-        return f"{LOCK_NAMES.get(data[2] & 0x03, 'unbekannte Sperre')} {'löschen' if data[3] == 0 else 'setzen'}"
+            return f"Lamellenwinkel: Korrekturfaktor {data[3]*5} %"  # 20 → 100 % (ETS-App)
+        return f"Wertkorrektur {data[2]}: Wert {data[3]}"
+    if command == 4:
+        return _lock_action(data)
     if command == 5:
         operation = data[2] & 0x7F
         name = OPERATION[operation] if operation < len(OPERATION) else f"unbekannt ({operation})"
         return f"{'lokal' if data[2] & 0x80 else 'Gruppe'}: {name}"
+    if command == 11:
+        return "inaktiv" if not any(data[2:]) else f"Werte {data[2]:02X} {data[3]:02X} {data[4]:02X} {data[5]:02X}"
     if command in {16, 17, 19, 20, 22, 23, 24}:
-        return f"Winkel {data[2]}–{data[3]}, Höhe {data[4]}–{data[5]}"
+        return f"Winkel frei von {data[2]} bis {data[3]} · Höhe frei von {data[4]} bis {data[5]}"
     return ""
 
 
@@ -210,6 +229,6 @@ def decode(data: bytes | list[int]) -> dict[str, Any]:
         "priority_confirmed": True if priority is not None else None,
         "protected": _is_protected(raw),
         "action": _action(command, raw),
-        "lock_active": (raw[3] != 0) if command == 4 and raw[2] else None,
+        "lock_active": bool(raw[2] & raw[3]) if command == 4 and raw[2] else None,
         "p1": raw[2], "p2": raw[3], "p3": raw[4], "p4": raw[5],
     }

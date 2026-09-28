@@ -26,7 +26,7 @@ def test_reference_telegram_from_forum_decodes_as_sector_36_priority_fix_p4() ->
     assert result["target"] == "Sektor 36"
     assert result["command"] == "Fahrbefehl"
     assert result["priority"] == "Prioritätsbefehl"
-    assert result["action"] == "Fixposition P4"
+    assert result["action"] == "Beschattungsposition P4"
     assert result["priority_confirmed"] is True
 
 
@@ -81,11 +81,11 @@ def test_safety_sequence_follows_the_central_controller() -> None:
     sequence = safety_sequence({"sector": 12, "drive": "oben", "lock": "beide", "priority": "sicherheit"})
     lock_drive, lock_key, drive = (decode(item) for item in sequence["set"])
     assert lock_drive["action"] == "Fahrbefehlssperre setzen" and lock_drive["lock_active"] is True
-    assert lock_key["action"] == "Tastensperre setzen"
+    assert lock_key["action"] == "Lokalbedienung sperren"
     assert drive["command"] == "Fahrbefehl" and drive["priority"] == "Sicherheitsbefehl"
     assert drive["action"] == "obere Endlage"
     released = [decode(item)["action"] for item in sequence["release"]]
-    assert released == ["Fahrbefehlssperre löschen", "Tastensperre löschen"]
+    assert released == ["Fahrbefehlssperre löschen", "Lokalbedienung freigeben"]
     assert lock_key["priority"] is None  # die Sperre trägt keine Priorität
     assert {item["target"] for item in (lock_drive, lock_key, drive)} == {"Sektor 12"}
     with pytest.raises(SCOError):
@@ -97,10 +97,10 @@ def test_reproduces_emx8_telegrams_byte_for_byte() -> None:
     sequence = safety_sequence({"sector": 1, "drive": "oben", "lock": "taste", "priority": "gefahr"})
     assert [sco.to_hex(frame) for frame in sequence["set"]] == ["01 10 02 02 00 00", "01 04 C1 00 00 00"]
     assert [sco.to_hex(frame) for frame in sequence["release"]] == ["01 10 01 00 00 00", "01 10 02 00 00 00"]
-    assert decode(parse_hex("01 10 02 02 00 00"))["action"] == "Tastensperre setzen"
+    assert decode(parse_hex("01 10 02 02 00 00"))["action"] == "Lokalbedienung sperren"
     assert decode(parse_hex("01 04 C1 00 00 00"))["priority"] == "Gefahrenbefehl"
     assert decode(parse_hex("01 10 01 00 00 00"))["action"] == "Fahrbefehlssperre löschen"
-    assert decode(parse_hex("01 58 00 FF 00 FF"))["action"] == "Winkel 0–255, Höhe 0–255"
+    assert decode(parse_hex("01 58 00 FF 00 FF"))["action"] == "Winkel frei von 0 bis 255 · Höhe frei von 0 bis 255"
     assert decode(parse_hex("01 08 00 14 00 00"))["command"] == "Wertkorrektur"
     assert decode(parse_hex("01 2C 00 00 00 00"))["command"] == "Busüberwachung"
 
@@ -118,7 +118,7 @@ def test_setting_a_lock_is_protected_releasing_is_not() -> None:
 def test_unknown_values_are_reported_not_guessed() -> None:
     result = decode(bytes([0x01, 12 << 2, 0, 0, 0, 0]))  # Command 12 ist nicht belegt
     assert result["command"].startswith("unbekannt")
-    assert decode(bytes([0x01, 0x04, 0x03, 9, 0, 0]))["action"] == "Fixposition unbekannt (9)"
+    assert decode(bytes([0x01, 0x04, 0x03, 9, 0, 0]))["action"] == "Beschattungsposition unbekannt (9)"
     assert decode(bytes([0, 0x04, 0, 0, 0, 0]))["target"] == "reserviert"
 
 
@@ -183,7 +183,7 @@ def test_monitor_decodes_sco_telegrams_and_builds_sector_overview() -> None:
         bus_connection._on_telegram(_incoming("1/1/1", bytes.fromhex("470463040000")))  # Standard-DPT: nicht deuten
         first = queue.get_nowait()
         assert first["sco"]["target"] == "Sektor 36"
-        assert "Fixposition P4" in first["value"]
+        assert "Beschattungsposition P4" in first["value"]
     finally:
         bus_connection.unsubscribe(queue)
     assert client.get("/api/sco/log").json()["size"] == 2
@@ -193,7 +193,7 @@ def test_monitor_decodes_sco_telegrams_and_builds_sector_overview() -> None:
     assert row["target"] == "Sektor 36" and row["count"] == 2 and row["source"] == "1.1.10"
     assert row["priorities"] == {"Prioritätsbefehl": 1}
     csv_text = client.get("/api/sco/export?format=csv").text
-    assert "47 04 63 04 00 00" in csv_text and "Fixposition P4" in csv_text
+    assert "47 04 63 04 00 00" in csv_text and "Beschattungsposition P4" in csv_text
     document = client.get("/api/sco/export").json()
     assert document["schema"] == "cko.ibs.sco-log.v1" and len(document["entries"]) == 2
     assert client.put("/api/sco/addresses", json={"addresses": ["8/0/0", "8/0/1"]}).json()["addresses"] == ["8/0/0", "8/0/1"]
@@ -223,7 +223,7 @@ def test_sending_uses_six_byte_group_value_write(monkeypatch) -> None:
     items = asyncio.run(bus_connection.send_sco("8/0/5", frames, "Sicherheit setzen"))
     assert [len(telegram.payload.to_knx()) for telegram in sent] == [8, 8]  # 2 Byte APCI + 6 Datenbyte
     assert tuple(sent[0].payload.value.value) == tuple(frames[0])
-    assert items[0]["sco"]["action"] == "Tastensperre setzen"
+    assert items[0]["sco"]["action"] == "Lokalbedienung sperren"
     assert items[1]["sco"]["priority"] == "Sicherheitsbefehl"
     assert items[0]["source"] == "1.12.252" and items[0]["origin"] == "IBS-Test: Sicherheit setzen"
     bus_connection.sco_log.clear()
@@ -239,10 +239,53 @@ def test_export_is_saved_in_downloads_folder(tmp_path, monkeypatch) -> None:
     assert first["folder"] == str(tmp_path) and first["path"] != second["path"]
     assert second["filename"].endswith("-2.json")
     document = json.loads((tmp_path / first["filename"]).read_text(encoding="utf-8"))
-    assert document["entries"][0]["decoded"]["action"] == "Tastensperre setzen"
+    assert document["entries"][0]["decoded"]["action"] == "Lokalbedienung sperren"
     csv_file = client.post("/api/sco/export/save", json={"format": "csv"}).json()
     assert "01 10 02 02 00 00" in (tmp_path / csv_file["filename"]).read_text(encoding="utf-8-sig")
     assert client.post("/api/sco/export/save", json={"format": "xml"}).status_code == 400
     assert client.post("/api/sco/export/reveal", json={"path": first["path"]}).json()["opened"] is False  # kein Windows
     assert client.post("/api/sco/export/reveal", json={"path": "/etc/passwd"}).status_code == 400
     bus_connection.sco_log.clear()
+
+
+# Paare aus dem Protokoll der ETS-App (GPA) vom 28.09.2026: Hex → Priorität, Bezeichnung der App
+GPA_REFERENCE = [
+    ("01 04 23 01 00 00", "Automatikbefehl", "Beschattungsposition P1"),
+    ("01 04 A1 00 00 00", "Sicherheitsbefehl", "obere Endlage"),
+    ("01 04 C1 00 00 00", "Gefahrenbefehl", "obere Endlage"),
+    ("01 04 62 00 00 00", "Prioritätsbefehl", "untere Endlage"),
+    ("01 04 65 00 00 00", "Prioritätsbefehl", "Wipp Auf · Wippdauer vom Aktor"),
+    ("01 04 66 00 00 00", "Prioritätsbefehl", "Wipp Ab · Wippdauer vom Aktor"),
+    ("01 04 67 00 00 00", "Prioritätsbefehl", "Stopp"),
+    ("01 10 02 02 00 00", None, "Lokalbedienung sperren"),
+    ("01 10 02 00 00 00", None, "Lokalbedienung freigeben"),
+    ("01 10 01 00 00 00", None, "Fahrbefehlssperre löschen"),
+    ("01 08 00 14 00 00", None, "Lamellenwinkel: Korrekturfaktor 100 %"),
+    ("01 2C 00 00 00 00", None, "inaktiv"),
+]
+
+
+@pytest.mark.parametrize(("hex_text", "priority", "action"), GPA_REFERENCE)
+def test_decoding_matches_ets_app(hex_text, priority, action) -> None:
+    result = decode(parse_hex(hex_text))
+    assert result["priority"] == priority
+    assert result["action"] == action
+
+
+def test_grenzen_names_follow_ets_app() -> None:
+    assert decode(parse_hex("01 40 00 FF 00 FF"))["command"] == "Grenzen Sicherheit"
+    assert decode(parse_hex("01 4C 00 FF 00 FF"))["command"] == "Grenzen Sicherheit Lokalbedienung"
+    assert decode(parse_hex("01 58 00 FF 00 FF"))["command"] == "Grenzen Automatik Lokalbedienung"
+
+
+def test_lock_masks_and_invalid_combination() -> None:
+    # P2 muss eine Teilmenge von P1 sein; 01/02 meldete die ETS-App als «Sperre: unbekannt»
+    assert decode(parse_hex("01 10 01 02 00 00"))["action"].startswith("Sperre unbekannt")
+    assert sco.to_hex(encode({"sector": 1, "lock": "fahrbefehl", "active": True}, allow_protected=True)) == "01 10 01 01 00 00"
+    assert decode(parse_hex("01 10 01 01 00 00"))["action"] == "Fahrbefehlssperre setzen"
+
+
+@pytest.mark.parametrize(("drive", "expected"), [("wipp_auf", "01 04 65 00 00 00"), ("wipp_ab", "01 04 66 00 00 00"),
+                                                  ("stopp", "01 04 67 00 00 00")])
+def test_new_drive_masks_reproduce_central_telegrams(drive, expected) -> None:
+    assert sco.to_hex(encode({"sector": 1, "drive": drive, "priority": "prioritaet"})) == expected

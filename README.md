@@ -3,6 +3,13 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 0.9.3
+
+- **Dekodierung nach der ETS-App (GPA) abgeglichen:** Wipp Auf/Ab (Wippdauer vom Aktor) und Stopp als Fahrbefehle, «Lokalbedienung sperren/freigeben», Lamellenwinkel-Korrekturfaktor, «Grenzen Sicherheit», «Grenzen Sicherheit/Automatik Lokalbedienung», Busüberwachung aktiv/inaktiv.
+- **Sperre als Maske:** P1 = betroffene Sperren, P2 = gesetzte Sperren. Ungültige Kombinationen (z. B. `01 10 01 02`) werden als «Sperre unbekannt» angezeigt. Die Fahrbefehlssperre setzt jetzt `01 10 01 01` (noch am Bus zu bestätigen).
+- **Neue Masken:** Wipp Auf, Wipp Ab und Stopp bei der Beschattungsposition.
+- **Beenden:** Das Programmfenster wird direkt aus der Anwendung geschlossen und hängt nicht mehr an der JavaScript-Brücke.
+
 ## Version 0.9.2
 
 - **Export JSON/CSV** speichert den Mitschnitt direkt im **Downloads-Ordner** des angemeldeten Benutzers (auch bei verschobenem Downloads-Ordner). Der Pfad wird angezeigt, «Im Explorer anzeigen» markiert die Datei. Das Programmfenster blockiert Browser-Downloads, deshalb speichert der lokale Dienst die Datei selbst.

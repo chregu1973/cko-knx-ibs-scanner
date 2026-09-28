@@ -58,19 +58,29 @@ def _application_is_running(url: str) -> bool:
 
 
 class DesktopApi:
-    """Small native bridge used only to close the desktop shell cleanly."""
+    """Small native bridge used only to close the desktop shell cleanly.
+
+    Internal state stays private (leading underscore): pywebview exposes public
+    attributes of the js_api object to JavaScript and must not walk into the
+    window object itself.
+    """
 
     def __init__(self) -> None:
-        self.window: Any | None = None
-        self.closed = threading.Event()
+        self._window: Any | None = None
+        self._closed = threading.Event()
+        self._closing = False
+
+    def attach(self, window: Any) -> None:
+        self._window = window
 
     def mark_closed(self) -> None:
-        self.closed.set()
+        self._closed.set()
 
     def close_window(self) -> bool:
-        window = self.window
-        if window is None:
+        window = self._window
+        if window is None or self._closing:
             return True
+        self._closing = True
 
         # Never destroy WebView synchronously inside its JavaScript bridge call.
         # The bridge has to return first; otherwise Edge WebView2 can wait forever
@@ -83,7 +93,7 @@ class DesktopApi:
                 LOGGER.exception("Das WebView-Fenster konnte nicht regulär geschlossen werden")
 
         def shutdown_watchdog() -> None:
-            if not self.closed.wait(timeout=4):
+            if not self._closed.wait(timeout=4):
                 LOGGER.warning("WebView reagiert nicht auf Schließen; Prozess wird beendet")
                 os._exit(0)
 
@@ -92,10 +102,12 @@ class DesktopApi:
         return True
 
 
-def _run_desktop_window(url: str, stop_server: Callable[[], None] | None = None) -> None:
+def _run_desktop_window(
+    url: str, stop_server: Callable[[], None] | None = None, api: DesktopApi | None = None
+) -> None:
     import webview
 
-    api = DesktopApi()
+    api = api or DesktopApi()
     window = webview.create_window(
         "CKO KNX IBS Scanner",
         url=url,
@@ -107,7 +119,7 @@ def _run_desktop_window(url: str, stop_server: Callable[[], None] | None = None)
         background_color="#091321",
         text_select=True,
     )
-    api.window = window
+    api.attach(window)
     window.events.closed += api.mark_closed
     if stop_server is not None:
         window.events.closed += stop_server
@@ -151,7 +163,15 @@ def main() -> None:
         LOGGER.info("CKO KNX IBS Scanner startet lokal auf %s", url)
         config = uvicorn.Config(app, host=host, port=port, log_config=None, access_log=False)
         server = uvicorn.Server(config)
-        set_shutdown_handler(lambda: setattr(server, "should_exit", True))
+        desktop_api = DesktopApi()
+
+        def shutdown_from_api() -> None:
+            # «Anwendung beenden» schliesst das Fenster direkt aus Python; so hängt das
+            # Beenden nicht davon ab, ob die JavaScript-Brücke von pywebview erreichbar ist.
+            server.should_exit = True
+            desktop_api.close_window()
+
+        set_shutdown_handler(shutdown_from_api)
         server_thread = threading.Thread(target=server.run, name="cko-ibs-server", daemon=True)
         server_thread.start()
         if not _wait_until_ready(url):
@@ -160,7 +180,7 @@ def main() -> None:
         def stop_server() -> None:
             server.should_exit = True
 
-        _run_desktop_window(desktop_url, stop_server)
+        _run_desktop_window(desktop_url, stop_server, desktop_api)
         server.should_exit = True
         server_thread.join(timeout=8)
     except Exception:

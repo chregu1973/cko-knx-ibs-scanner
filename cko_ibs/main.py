@@ -396,7 +396,7 @@ def _sector_overview(entries: list[dict]) -> list[dict]:
         row = overview.setdefault(key, {
             "group_address": entry["destination"], "group_name": entry.get("group_name"),
             "target": decoded["target"], "sector_from": decoded["sector_from"], "source": entry["source"],
-            "origin": entry.get("origin", "bus"), "count": 0, "commands": {}, "priorities": {},
+            "origin": "IBS-Test" if str(entry.get("origin", "")).startswith("IBS-Test") else "bus", "count": 0, "commands": {}, "priorities": {},
             "first_seen": entry["time"], "last_seen": entry["time"], "last_action": ""})
         row["count"] += 1
         row["commands"][decoded["command"]] = row["commands"].get(decoded["command"], 0)+1

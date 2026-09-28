@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>CKO KNX IBS Scanner</title>
     <link rel="icon" href="/static/cko-toolbox-logo.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=0.9.2" />
-    <link rel="stylesheet" href="/static/connection.css?v=0.9.2" />
-    <link rel="stylesheet" href="/static/branding.css?v=0.9.2" />
-    <link rel="stylesheet" href="/static/sco.css?v=0.9.2" />
+    <link rel="stylesheet" href="/static/styles.css?v=0.9.3" />
+    <link rel="stylesheet" href="/static/connection.css?v=0.9.3" />
+    <link rel="stylesheet" href="/static/branding.css?v=0.9.3" />
+    <link rel="stylesheet" href="/static/sco.css?v=0.9.3" />
   </head>
   <body>
     <aside class="sidebar">
@@ -21,7 +21,7 @@
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
       </nav>
-      <div class="sidebar-version"><span>Installierte Version</span><strong>KNX IBS Scanner 0.9.2</strong></div>
+      <div class="sidebar-version"><span>Installierte Version</span><strong>KNX IBS Scanner 0.9.3</strong></div>
       <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
       <a class="return-button" href="https://toolbox.ckoeppen.ch/">← Zurück zur Toolbox</a>
     </aside>
@@ -197,8 +197,8 @@
               <button type="button" data-sco-mode="raw">Rohtelegramm</button>
             </div>
             <div class="sco-form" data-mode="drive">
-              <label>Fahrbefehl<select id="sco-drive"><option value="oben">Obere Endlage</option><option value="unten">Untere Endlage</option><option value="fix" selected>Fixposition</option><option value="keine">Keine Fahrbewegung</option></select></label>
-              <label>Fixposition<select id="sco-position"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+              <label>Fahrbefehl<select id="sco-drive"><option value="oben">Obere Endlage</option><option value="unten">Untere Endlage</option><option value="fix" selected>Beschattungsposition</option><option value="wipp_auf">Wipp Auf (Wippdauer vom Aktor)</option><option value="wipp_ab">Wipp Ab (Wippdauer vom Aktor)</option><option value="stopp">Stopp</option><option value="keine">Keine Fahrbewegung</option></select></label>
+              <label>Beschattungsposition<select id="sco-position"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
               <label>Priorität<select id="sco-priority"><option value="grenz">Grenzbefehl</option><option value="automatik" selected>Automatikbefehl</option><option value="prioritaet">Prioritätsbefehl</option></select></label>
             </div>
             <div class="sco-form" data-mode="operation" hidden>
@@ -207,11 +207,11 @@
             </div>
             <div class="sco-form" data-mode="safety" hidden>
               <label>Priorität<select id="sco-safety-priority"><option value="sicherheit">Sicherheitsbefehl</option><option value="warn">Warnbefehl</option><option value="gefahr">Gefahrenbefehl</option></select></label>
-              <label>Fahren auf<select id="sco-safety-drive"><option value="oben">Obere Endlage</option><option value="unten">Untere Endlage</option><option value="fix">Fixposition</option><option value="keine">Keine Fahrbewegung</option></select></label>
-              <label>Fixposition<select id="sco-safety-position"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
-              <label>Sperre<select id="sco-lock"><option value="taste" selected>Tastensperre (wie Zentrale)</option><option value="fahrbefehl">Fahrbefehlssperre</option><option value="beide">Fahrbefehls- und Tastensperre (einzeln)</option></select></label>
+              <label>Fahren auf<select id="sco-safety-drive"><option value="oben">Obere Endlage</option><option value="unten">Untere Endlage</option><option value="fix">Beschattungsposition</option><option value="keine">Keine Fahrbewegung</option></select></label>
+              <label>Beschattungsposition<select id="sco-safety-position"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+              <label>Sperre<select id="sco-lock"><option value="taste" selected>Lokalbedienung sperren (wie Zentrale)</option><option value="fahrbefehl">Fahrbefehlssperre – noch nicht bestätigt</option><option value="beide">Beide einzeln – Fahrbefehlssperre noch nicht bestätigt</option></select></label>
               <label class="check wide"><input id="sco-allow-protected" type="checkbox" /> Sicherheitsbefehle freigeben – ich teste an der Simulation der Zentrale oder einem Testsektor</label>
-              <p class="field-hint wide">Ablauf wie die Zentrale: Setzen = Sperre setzen, danach Fahrbefehl mit gewählter Priorität. Aufheben = Fahrbefehlssperre und Tastensperre einzeln löschen.</p>
+              <p class="field-hint wide">Ablauf wie die Zentrale: Setzen = Lokalbedienung sperren, danach Fahrbefehl mit gewählter Priorität. Aufheben = Fahrbefehlssperre löschen und Lokalbedienung freigeben.</p>
             </div>
             <div class="sco-form" data-mode="raw" hidden>
               <label class="wide">6 Byte hex (z. B. aus dem Mitschnitt)<input id="sco-raw" placeholder="47 04 63 04 00 00" autocomplete="off" /></label>
@@ -254,7 +254,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/app.js?v=0.9.2"></script>
-    <script src="/static/sco.js?v=0.9.2"></script>
+    <script src="/static/app.js?v=0.9.3"></script>
+    <script src="/static/sco.js?v=0.9.3"></script>
   </body>
 </html>
