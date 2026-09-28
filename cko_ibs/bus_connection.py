@@ -4,18 +4,26 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import re
+from collections import deque
 from contextlib import suppress
 from datetime import datetime
 from typing import Any
 
 from xknx import XKNX
+from xknx.dpt import DPTArray
 from xknx.exceptions import XKNXException
 from xknx.io import ConnectionConfig, ConnectionType, SecureConfig
 from xknx.management.procedures import nm_individual_address_check
 from xknx.telegram import Telegram, apci
-from xknx.telegram.address import IndividualAddress
+from xknx.telegram.address import GroupAddress, IndividualAddress
 
+from cko_ibs import sco
 from cko_ibs.usb_connection import KNXUSBInterface, find_usb_device
+
+# Erkennt SCO-Objekte an ihrer Bezeichnung im ETS-Projekt (auch an der Herstellerbezeichnung)
+SCO_NAME_HINT = re.compile(r"\bsco\b|suncontrol|griesser|6[ -]?byte|sektor", re.IGNORECASE)
+SCO_LOG_SIZE = 5000
 
 DEVICE_OBJECT_PROPERTIES = {
     "object_name": 2,
@@ -58,6 +66,8 @@ class BusConnection:
         self.usb_device: dict[str, Any] | None = None
         self._subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
         self._group_addresses: dict[str, dict[str, str | None]] = {}
+        self._sco_addresses: set[str] = set()
+        self.sco_log: deque[dict[str, Any]] = deque(maxlen=SCO_LOG_SIZE)
         self._lock = asyncio.Lock()
 
     @property
@@ -407,6 +417,86 @@ class BusConnection:
         }
         self.xknx.group_address_dpt.set(dpts)
 
+    # --- SCO-Objekt ---------------------------------------------------------
+
+    def sco_suggestions(self) -> list[dict[str, str | None]]:
+        """GAs aus dem ETS-Projekt, deren Bezeichnung auf ein SCO-Objekt hindeutet."""
+        return [row for address, row in sorted(self._group_addresses.items())
+                if SCO_NAME_HINT.search(str(row.get("name") or ""))]
+
+    @property
+    def sco_addresses(self) -> list[str]:
+        return sorted(self._sco_addresses)
+
+    def set_sco_addresses(self, addresses: list[str]) -> list[str]:
+        valid = set()
+        for address in addresses:
+            valid.add(str(GroupAddress(str(address).strip())))
+        self._sco_addresses = valid
+        return self.sco_addresses
+
+    def _sco_candidate(self, destination: str) -> bool:
+        # Markierte GAs immer; sonst nur GAs ohne bekannten Standard-DPT, damit nichts falsch gedeutet wird
+        if destination in self._sco_addresses:
+            return True
+        return not self._group_addresses.get(destination, {}).get("dpt")
+
+    def _publish(self, item: dict[str, Any]) -> None:
+        for queue in tuple(self._subscribers):
+            if queue.full():
+                try:
+                    queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+            queue.put_nowait(item)
+
+    def _attach_sco(self, item: dict[str, Any], payload: Any) -> None:
+        value = getattr(payload, "value", None)
+        if not isinstance(value, DPTArray) or len(value.value) != 6:
+            return
+        if not self._sco_candidate(item["destination"]):
+            return
+        decoded = sco.decode(bytes(value.value))
+        item["sco"] = decoded
+        item["value"] = f"{decoded['target']} · {decoded['command']}" + (
+            f" · {decoded['priority']}" if decoded["priority"] else "") + (
+            f" · {decoded['action']}" if decoded["action"] else "")
+        self.sco_log.append({key: item.get(key) for key in (
+            "time", "direction", "source", "destination", "group_name", "service", "secure")} | {
+            "hex": decoded["hex"], "decoded": decoded, "origin": item.get("origin", "bus")})
+
+    async def send_sco(self, group_address: str, frames: list[bytes], label: str = "") -> list[dict[str, Any]]:
+        """6-Byte-Telegramme nacheinander als GroupValueWrite senden und protokollieren."""
+        if not self.connected or self.xknx is None:
+            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst verbinden.")
+        destination = GroupAddress(group_address)
+        sent = []
+        for index, frame in enumerate(frames):
+            if len(frame) != 6:
+                raise ValueError("SCO-Telegramme müssen genau 6 Byte lang sein.")
+            payload = apci.GroupValueWrite(DPTArray(tuple(frame)))
+            await self.xknx.telegrams.put(Telegram(destination_address=destination, payload=payload))
+            item = {
+                "time": datetime.now().astimezone().isoformat(timespec="milliseconds"),
+                "direction": "Outgoing",
+                "source": str(self.xknx.current_address),
+                "destination": str(destination),
+                "group_name": self._group_addresses.get(str(destination), {}).get("name"),
+                "dpt": None,
+                "service": "GroupValueWrite",
+                "value": None,
+                "raw": str(payload),
+                "secure": False,
+                "origin": f"IBS-Test{': ' + label if label else ''}",
+            }
+            self._sco_addresses.add(str(destination))
+            self._attach_sco(item, payload)
+            self._publish(item)
+            sent.append(item)
+            if index < len(frames)-1:
+                await asyncio.sleep(0.25)  # Reihenfolge Fahrbefehl → Sperre auf dem Bus sicherstellen
+        return sent
+
     def subscribe(self) -> asyncio.Queue[dict[str, Any]]:
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=250)
         self._subscribers.add(queue)
@@ -434,13 +524,9 @@ class BusConnection:
             "raw": str(payload) if payload is not None else "",
             "secure": telegram.data_secure is True,
         }
-        for queue in tuple(self._subscribers):
-            if queue.full():
-                try:
-                    queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    pass
-            queue.put_nowait(item)
+        with suppress(sco.SCOError):
+            self._attach_sco(item, payload)
+        self._publish(item)
 
 
 bus_connection = BusConnection()

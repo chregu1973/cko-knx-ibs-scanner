@@ -3,6 +3,42 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.0.0
+
+Erste stabile Version mit SCO-Objekt. Alle sendbaren Befehle sind am Bus mit einer Beschattungszentrale und der ETS-App geprüft (28.09.2026):
+
+- **Fahrbefehle:** obere/untere Endlage, Beschattungsposition P1–P4, Wipp Auf/Ab (Wippdauer vom Aktor), Stopp – mit Grenz-, Automatik- oder Prioritätsbefehl.
+- **Lokalbedienung:** Lang/Kurz Auf/Ab, Stopp, Lang-Kurz; Bit 7 = Automatiksperre setzen (1) oder löschen (0). Die bisherige Deutung lokal/Gruppe stammte aus KNXUltimate und war falsch.
+- **Sicherheit:** Setzen = Sperre (Lokalbedienung und/oder Fahrbefehlssperre, P1 = betroffene, P2 = gesetzte Sperren), danach Fahrbefehl mit Warn-, Sicherheits- oder Gefahrenpriorität; Aufheben = beide Sperren einzeln löschen.
+- **Dekodierung** wie die ETS-App, abgesichert mit Referenztests aus deren Protokoll; Export in den Downloads-Ordner; Programmfenster schliesst beim Beenden.
+
+## Version 0.9.3
+
+- **Dekodierung nach der ETS-App (GPA) abgeglichen:** Wipp Auf/Ab (Wippdauer vom Aktor) und Stopp als Fahrbefehle, «Lokalbedienung sperren/freigeben», Lamellenwinkel-Korrekturfaktor, «Grenzen Sicherheit», «Grenzen Sicherheit/Automatik Lokalbedienung», Busüberwachung aktiv/inaktiv.
+- **Sperre als Maske:** P1 = betroffene Sperren, P2 = gesetzte Sperren. Ungültige Kombinationen (z. B. `01 10 01 02`) werden als «Sperre unbekannt» angezeigt. Die Fahrbefehlssperre setzt jetzt `01 10 01 01` (am Bus mit der ETS-App bestätigt).
+- **Neue Masken:** Wipp Auf, Wipp Ab und Stopp bei der Beschattungsposition.
+- **Beenden:** Das Programmfenster wird direkt aus der Anwendung geschlossen und hängt nicht mehr an der JavaScript-Brücke.
+
+## Version 0.9.2
+
+- **Export JSON/CSV** speichert den Mitschnitt direkt im **Downloads-Ordner** des angemeldeten Benutzers (auch bei verschobenem Downloads-Ordner). Der Pfad wird angezeigt, «Im Explorer anzeigen» markiert die Datei. Das Programmfenster blockiert Browser-Downloads, deshalb speichert der lokale Dienst die Datei selbst.
+
+## Version 0.9.1
+
+- **Sicherheit wie die Zentrale:** Nach einem Mitschnitt einer Beschattungszentrale korrigiert. Die Sperre trägt keine Priorität (P1 = Sperrart, P2 = 02 zum Setzen, 00 zum Löschen). Setzen = Sperre, danach Fahrbefehl mit Warn-, Sicherheits- oder Gefahrenpriorität; Aufheben = Fahrbefehlssperre und Tastensperre einzeln löschen. Die Telegramme der Zentrale werden Byte für Byte nachgebildet.
+- Am Bus mit der ETS-App geprüft: Fahrbefehl (Sektor, Priorität, Fixposition) und lokale Bedienung.
+
+## Version 0.9.0 – SCO-Objekt (6 Byte)
+
+Neue Seite **SCO-Objekt** für das proprietäre SCO-Objekt (6 Byte, «SunControl Object»):
+
+- **Testmaske:** Gruppenadresse, einzelner Sektor (1–512) oder Sektorgruppe; Beschattungsposition (obere/untere Endlage, Fixposition P1–P4) mit Grenz-, Automatik- oder Prioritätsbefehl; lokale oder Gruppenbedienung; Rohtelegramm (Replay aus dem Mitschnitt).
+- **Sicherheit für den Sektor:** Setzen = Fahrbefehl mit Warn-, Sicherheits- oder Gefahrenpriorität + Sperre aktiv; Aufheben = Sperre passiv mit gleicher Priorität und Sperrart. Nur nach ausdrücklicher Freigabe. Ein Banner zeigt von hier gesetzte Sperren mit «Aufheben», bis sie gelöscht sind.
+- Jede Sendung erst nach **Vorschau** (Hex und Klartext) und Bestätigung; gesendet wird als GroupValueWrite mit genau 6 Datenbyte über die bestehende KNX-Verbindung.
+- **Mitschnitt und Datenauflösung:** SCO-Telegramme auf markierten GAs und auf GAs ohne Standard-DPT werden dekodiert (Sektor, Befehl, Priorität, Aktion, P1–P4). «= Vorschau» markiert Byte-gleiche Telegramme – so lassen sich eigene Befehle mit denen der Beschattungszentrale (z. B. im Simulationsbetrieb) vergleichen.
+- **Sektorübersicht** je GA, Sektor und Quelle mit Befehlen und Prioritäten; Export des Mitschnitts als JSON oder CSV.
+- Belegung nach Flow v3 (hbTec) und KNXUltimate `dpt60001`.
+
 ## Version 0.8.2
 
 Version 0.8.2 verhindert veraltete WebView-Inhalte nach einem Update. Die Oberfläche wird immer aus der aktuell installierten Version geladen; die Versionsnummer bleibt direkt in der Sidebar sichtbar.

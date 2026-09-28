@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>CKO KNX IBS Scanner</title>
     <link rel="icon" href="/static/cko-toolbox-logo.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=0.8.2" />
-    <link rel="stylesheet" href="/static/connection.css?v=0.8.2" />
-    <link rel="stylesheet" href="/static/branding.css?v=0.8.2" />
+    <link rel="stylesheet" href="/static/styles.css?v=1.0.0" />
+    <link rel="stylesheet" href="/static/connection.css?v=1.0.0" />
+    <link rel="stylesheet" href="/static/branding.css?v=1.0.0" />
+    <link rel="stylesheet" href="/static/sco.css?v=1.0.0" />
   </head>
   <body>
     <aside class="sidebar">
@@ -15,11 +16,12 @@
       <nav>
         <button id="overview-nav" class="nav-item active" type="button" data-view="overview">⌂ <span>Übersicht</span></button>
         <button id="monitor-nav" class="nav-item" type="button" data-view="monitor">↯ <span>Gruppenmonitor</span></button>
+        <button id="sco-nav" class="nav-item" type="button" data-view="sco">⇅ <span>SCO-Objekt</span></button>
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▦ <span>Gebäude<small>folgt</small></span></button>
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
       </nav>
-      <div class="sidebar-version"><span>Installierte Version</span><strong>KNX IBS Scanner 0.8.2</strong></div>
+      <div class="sidebar-version"><span>Installierte Version</span><strong>KNX IBS Scanner 1.0.0</strong></div>
       <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
       <a class="return-button" href="https://toolbox.ckoeppen.ch/">← Zurück zur Toolbox</a>
     </aside>
@@ -158,6 +160,88 @@
           <div class="monitor-table-wrap"><table class="monitor-table"><thead><tr><th>Zeit</th><th>Von</th><th>Gruppenadresse / Bezeichnung</th><th>DPT</th><th>Dienst</th><th>Wert</th><th>Rohdaten</th></tr></thead><tbody id="monitor-body"><tr class="monitor-empty"><td colspan="7">KNX-Verbindung aufbauen und anschließend den Monitor starten.</td></tr></tbody></table></div>
         </section>
       </div>
+
+      <div id="sco-view" class="app-view" hidden>
+        <header class="monitor-page-header">
+          <div><p class="eyebrow">SCO-OBJEKT · 6 BYTE · SCO</p><h1>SCO-Test</h1><p class="page-lead">Sektoren gezielt ansteuern, Sicherheit setzen und aufheben sowie SCO-Telegramme mitschneiden und dekodieren.</p></div>
+          <div class="header-actions"><span id="sco-connection-badge" class="badge muted">○ Nicht verbunden</span><span id="sco-monitor-badge" class="badge muted">○ Mitschnitt aus</span></div>
+        </header>
+        <div id="sco-lock-banner" class="sco-lock-banner" hidden></div>
+        <section class="sco-note"><strong>Hinweis:</strong> Fahrbefehle, Lokalbedienung und Sicherheit (Fahrbefehlssperre, Lokalbedienung) sind am Bus mit einer Zentrale und der ETS-App geprüft. Eigene Sicherheitsbefehle trotzdem zuerst an einer Simulation oder einem Testsektor ausprobieren. Die Beschattungszentrale kann Testbefehle mit ihrer Automatik übersteuern. Zuerst mit der Simulation der Zentrale oder einem Testsektor prüfen.</section>
+        <div class="sco-grid">
+          <section class="panel">
+            <div class="panel-heading"><h2>1 · Ziel</h2></div>
+            <div class="sco-form">
+              <label class="wide">Gruppenadresse des SCO-Objekts
+                <input id="sco-ga" list="sco-ga-list" placeholder="z. B. 8/0/0" autocomplete="off" />
+                <datalist id="sco-ga-list"></datalist>
+              </label>
+              <label>Ziel
+                <select id="sco-target-kind"><option value="sector">Einzelner Sektor</option><option value="group">Sektorgruppe</option></select>
+              </label>
+              <label data-target="sector">Sektor (1–512)<input id="sco-sector" type="number" min="1" max="512" value="1" /></label>
+              <label data-target="group" hidden>Gruppenstart<input id="sco-group-start" type="number" min="1" max="511" value="1" /></label>
+              <label data-target="group" hidden>Gruppengrösse
+                <select id="sco-group-size"><option>2</option><option selected>4</option><option>8</option><option>16</option><option>32</option><option>64</option><option>128</option><option>256</option><option>512</option></select>
+              </label>
+            </div>
+            <p id="sco-target-info" class="message"></p>
+            <div class="sco-suggestions" id="sco-suggestions"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-heading"><h2>2 · Befehl</h2></div>
+            <div class="sco-mode" role="tablist">
+              <button type="button" class="active" data-sco-mode="drive">Beschattungsposition</button>
+              <button type="button" data-sco-mode="operation">Lokalbedienung</button>
+              <button type="button" data-sco-mode="safety">Sicherheit</button>
+              <button type="button" data-sco-mode="raw">Rohtelegramm</button>
+            </div>
+            <div class="sco-form" data-mode="drive">
+              <label>Fahrbefehl<select id="sco-drive"><option value="oben">Obere Endlage</option><option value="unten">Untere Endlage</option><option value="fix" selected>Beschattungsposition</option><option value="wipp_auf">Wipp Auf (Wippdauer vom Aktor)</option><option value="wipp_ab">Wipp Ab (Wippdauer vom Aktor)</option><option value="stopp">Stopp</option><option value="keine">Keine Fahrbewegung</option></select></label>
+              <label>Beschattungsposition<select id="sco-position"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+              <label>Priorität<select id="sco-priority"><option value="grenz">Grenzbefehl</option><option value="automatik" selected>Automatikbefehl</option><option value="prioritaet">Prioritätsbefehl</option></select></label>
+            </div>
+            <div class="sco-form" data-mode="operation" hidden>
+              <label>Lokalbedienung<select id="sco-operation"><option>lang auf</option><option>lang ab</option><option>kurz auf</option><option>kurz ab</option><option selected>Stopp</option><option>lang-kurz auf</option><option>lang-kurz ab</option></select></label>
+              <label>Automatiksperre<select id="sco-local"><option value="1" selected>setzen</option><option value="0">löschen</option></select></label>
+            </div>
+            <div class="sco-form" data-mode="safety" hidden>
+              <label>Priorität<select id="sco-safety-priority"><option value="sicherheit">Sicherheitsbefehl</option><option value="warn">Warnbefehl</option><option value="gefahr">Gefahrenbefehl</option></select></label>
+              <label>Fahren auf<select id="sco-safety-drive"><option value="oben">Obere Endlage</option><option value="unten">Untere Endlage</option><option value="fix">Beschattungsposition</option><option value="keine">Keine Fahrbewegung</option></select></label>
+              <label>Beschattungsposition<select id="sco-safety-position"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+              <label>Sperre<select id="sco-lock"><option value="taste" selected>Lokalbedienung sperren (wie Zentrale)</option><option value="fahrbefehl">Fahrbefehlssperre</option><option value="beide">Fahrbefehlssperre und Lokalbedienung (einzeln)</option></select></label>
+              <label class="check wide"><input id="sco-allow-protected" type="checkbox" /> Sicherheitsbefehle freigeben – ich teste an der Simulation der Zentrale oder einem Testsektor</label>
+              <p class="field-hint wide">Ablauf wie die Zentrale: Setzen = Lokalbedienung sperren, danach Fahrbefehl mit gewählter Priorität. Aufheben = Fahrbefehlssperre löschen und Lokalbedienung freigeben.</p>
+            </div>
+            <div class="sco-form" data-mode="raw" hidden>
+              <label class="wide">6 Byte hex (z. B. aus dem Mitschnitt)<input id="sco-raw" placeholder="47 04 63 04 00 00" autocomplete="off" /></label>
+              <label class="check wide"><input id="sco-raw-allow-protected" type="checkbox" /> Enthält Sicherheitsbefehl – bewusst freigeben</label>
+            </div>
+            <div class="sco-actions"><button id="sco-preview-button" class="primary" type="button">Vorschau erstellen</button></div>
+            <div id="sco-preview" class="sco-preview" hidden></div>
+            <p id="sco-message" class="message"></p>
+          </section>
+        </div>
+        <section class="panel sco-capture">
+          <div class="panel-heading">
+            <h2>3 · Mitschnitt und Datenauflösung</h2>
+            <div class="sco-actions">
+              <button id="sco-monitor-button" class="primary" type="button">Mitschnitt starten</button>
+              <button id="sco-export-json" class="secondary" type="button">Export JSON</button>
+              <button id="sco-export-csv" class="secondary" type="button">Export CSV</button>
+              <button id="sco-clear-button" class="secondary" type="button">Mitschnitt löschen</button>
+            </div>
+          </div>
+          <p id="sco-export-message" class="message"></p>
+          <p class="field-hint">SCO-Telegramme werden auf markierten Gruppenadressen und auf Adressen ohne Standard-DPT dekodiert. «= Vorschau» zeigt, dass ein Telegramm Byte für Byte der aktuellen Vorschau entspricht.</p>
+          <div class="monitor-table-wrap"><table class="monitor-table sco-table"><thead><tr><th>Zeit</th><th>Herkunft</th><th>Von</th><th>GA</th><th>Ziel</th><th>Befehl</th><th>Priorität</th><th>Aktion</th><th>Hex</th><th></th></tr></thead><tbody id="sco-body"><tr class="monitor-empty"><td colspan="10">Verbinden und Mitschnitt starten.</td></tr></tbody></table></div>
+        </section>
+        <section class="panel sco-capture">
+          <div class="panel-heading"><h2>4 · Sektorübersicht</h2><button id="sco-sectors-button" class="secondary" type="button">Aktualisieren</button></div>
+          <p class="field-hint">Welche Sektoren auf welcher Gruppenadresse von welcher Quelle mit welchen Befehlen und Prioritäten angesprochen werden – so lassen sich Sektornummern und die Priorität der Zentrale ermitteln.</p>
+          <div class="monitor-table-wrap"><table class="monitor-table"><thead><tr><th>GA</th><th>Ziel</th><th>Quelle</th><th>Anzahl</th><th>Befehle</th><th>Prioritäten</th><th>Zuletzt</th></tr></thead><tbody id="sco-sectors-body"><tr class="monitor-empty"><td colspan="7">Noch keine SCO-Telegramme.</td></tr></tbody></table></div>
+        </section>
+      </div>
     </main>
     <dialog id="shutdown-dialog" class="shutdown-dialog">
       <form method="dialog">
@@ -170,6 +254,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/app.js?v=0.8.2"></script>
+    <script src="/static/app.js?v=1.0.0"></script>
+    <script src="/static/sco.js?v=1.0.0"></script>
   </body>
 </html>

@@ -1,3 +1,3 @@
 """CKO KNX IBS Scanner."""
 
-__version__ = "0.8.2"
+__version__ = "1.0.0"
