@@ -65,7 +65,8 @@ def test_every_operation_round_trips() -> None:
                 data = encode({"sector": sector, "operation": operation, "local": local})
                 result = decode(data)
                 assert result["target"] == f"Sektor {sector}"
-                assert result["action"] == f"{'lokal' if local else 'Gruppe'}: {operation}"
+                name = sco.OPERATION_NAMES[sco.OPERATION.index(operation)]
+                assert result["action"] == f"{name} · {'mit Automatiksperre setzen' if local else 'ohne Automatiksperre'}"
 
 
 def test_protected_priorities_are_blocked_unless_released() -> None:
@@ -263,6 +264,9 @@ GPA_REFERENCE = [
     ("01 10 01 01 00 00", None, "Fahrbefehlssperre setzen"),
     ("01 08 00 14 00 00", None, "Lamellenwinkel: Korrekturfaktor 100 %"),
     ("01 2C 00 00 00 00", None, "inaktiv"),
+    ("01 14 80 00 00 00", None, "Lang Auf · mit Automatiksperre setzen"),
+    ("01 14 82 00 00 00", None, "Kurz Auf · mit Automatiksperre setzen"),
+    ("01 14 84 00 00 00", None, "Stopp · mit Automatiksperre setzen"),
 ]
 
 

@@ -192,7 +192,7 @@
             <div class="panel-heading"><h2>2 · Befehl</h2></div>
             <div class="sco-mode" role="tablist">
               <button type="button" class="active" data-sco-mode="drive">Beschattungsposition</button>
-              <button type="button" data-sco-mode="operation">Bedienung</button>
+              <button type="button" data-sco-mode="operation">Lokalbedienung</button>
               <button type="button" data-sco-mode="safety">Sicherheit</button>
               <button type="button" data-sco-mode="raw">Rohtelegramm</button>
             </div>
@@ -202,8 +202,8 @@
               <label>Priorität<select id="sco-priority"><option value="grenz">Grenzbefehl</option><option value="automatik" selected>Automatikbefehl</option><option value="prioritaet">Prioritätsbefehl</option></select></label>
             </div>
             <div class="sco-form" data-mode="operation" hidden>
-              <label>Bedienung<select id="sco-operation"><option>lang auf</option><option>lang ab</option><option>kurz auf</option><option>kurz ab</option><option selected>Stopp</option><option>lang-kurz auf</option><option>lang-kurz ab</option></select></label>
-              <label class="check"><input id="sco-local" type="checkbox" checked /> Lokale Bedienung (sonst Gruppe)</label>
+              <label>Lokalbedienung<select id="sco-operation"><option>lang auf</option><option>lang ab</option><option>kurz auf</option><option>kurz ab</option><option selected>Stopp</option><option>lang-kurz auf</option><option>lang-kurz ab</option></select></label>
+              <label class="check"><input id="sco-local" type="checkbox" checked /> Mit Automatiksperre setzen (ohne: noch nicht am Bus geprüft)</label>
             </div>
             <div class="sco-form" data-mode="safety" hidden>
               <label>Priorität<select id="sco-safety-priority"><option value="sicherheit">Sicherheitsbefehl</option><option value="warn">Warnbefehl</option><option value="gefahr">Gefahrenbefehl</option></select></label>

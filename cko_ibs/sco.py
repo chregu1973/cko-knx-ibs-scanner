@@ -10,7 +10,8 @@ Belegung nach Flow v3 (hbTec, 28.09.2026), KNXUltimate ``dpt60001`` und KNX-User
   Priorität; P2 = Maske der gesetzten Sperren, 0 = löschen (Mitschnitt und ETS-App, 28.09.2026).
 * Sicherheit wie die Zentrale: zuerst Sperre setzen, dann Fahrbefehl mit Warn-/Sicherheits-/
   Gefahrenpriorität; Aufheben = Fahrbefehlssperre und Tastensperre einzeln löschen.
-* Bedienung (5): P1 Bit 7 lokal (1) / Gruppe (0), Bit 0–6 Bedienart.
+* Lokalbedienung (5): P1 Bit 0–6 Bedienart, Bit 7 = «mit Automatiksperre setzen» (ETS-App, 28.09.2026;
+  KNXUltimate deutet Bit 7 als lokal/Gruppe).
 
 Das Objekt ist kein KNX-Standard-Datenpunkt. Unbekannte Werte werden roh gemeldet, nie geraten.
 """
@@ -22,7 +23,7 @@ from typing import Any
 
 COMMANDS = {
     1: "Fahrbefehl", 2: "Wertkorrektur", 3: "Automatikzustand", 4: "Sperre setzen/löschen",
-    5: "Bedienung", 6: "Szene setzen", 7: "Spezialbefehl", 8: "Datum", 9: "Zeit synchronisieren",
+    5: "Lokalbedienung", 6: "Szene setzen", 7: "Spezialbefehl", 8: "Datum", 9: "Zeit synchronisieren",
     10: "Sensorwert-Meldung", 11: "Busüberwachung",
     # 16, 19 und 22 sind mit der ETS-App bestätigt; 17, 20, 23 und 24 nach KNXUltimate
     16: "Grenzen Sicherheit", 17: "Fahrbereichsgrenzen Sicherheitsfahrbefehle",
@@ -39,6 +40,7 @@ DRIVE = {"keine": 0, "oben": 1, "unten": 2, "fix": 3, "wipp_auf": 5, "wipp_ab": 
 DRIVE_NAMES = {0: "keine Fahrbewegung", 1: "obere Endlage", 2: "untere Endlage", 3: "Beschattungsposition",
                5: "Wipp Auf · Wippdauer vom Aktor", 6: "Wipp Ab · Wippdauer vom Aktor", 7: "Stopp"}
 OPERATION = ["lang auf", "lang ab", "kurz auf", "kurz ab", "Stopp", "lang-kurz auf", "lang-kurz ab"]
+OPERATION_NAMES = ["Lang Auf", "Lang Ab", "Kurz Auf", "Kurz Ab", "Stopp", "Lang-Kurz Auf", "Lang-Kurz Ab"]
 # Sperre: P1 = Maske der betroffenen Sperren, P2 = Maske der zu setzenden Sperren (0 = löschen).
 # Bestätigt: 02/02 Lokalbedienung sperren, 02/00 freigeben, 01/00 Fahrbefehlssperre löschen.
 # 01/02 meldet die ETS-App als «Sperre: unbekannt»; 01/01 = Fahrbefehlssperre setzen (bestätigt 28.09.2026).
@@ -142,8 +144,9 @@ def encode(spec: dict[str, Any], allow_protected: bool = False) -> bytes:
         if spec["operation"] not in OPERATION:
             raise SCOError(f"Bedienung muss eine von {', '.join(OPERATION)} sein")
         byte0, byte1 = _header(spec, 5)
-        local = 0x80 if spec.get("local", True) else 0
-        return bytes([byte0, byte1, local | OPERATION.index(spec["operation"]), 0, 0, 0])
+        # «local» ist der frühere Name des Schalters und bleibt als Alias erhalten
+        auto_lock = spec.get("automatic_lock", spec.get("local", True))
+        return bytes([byte0, byte1, (0x80 if auto_lock else 0) | OPERATION.index(spec["operation"]), 0, 0, 0])
     raise SCOError("Beschreibung braucht drive, lock, operation oder hex")
 
 
@@ -199,8 +202,8 @@ def _action(command: int, data: bytes) -> str:
         return _lock_action(data)
     if command == 5:
         operation = data[2] & 0x7F
-        name = OPERATION[operation] if operation < len(OPERATION) else f"unbekannt ({operation})"
-        return f"{'lokal' if data[2] & 0x80 else 'Gruppe'}: {name}"
+        name = OPERATION_NAMES[operation] if operation < len(OPERATION_NAMES) else f"unbekannt ({operation})"
+        return f"{name} · {'mit Automatiksperre setzen' if data[2] & 0x80 else 'ohne Automatiksperre'}"
     if command == 11:
         return "inaktiv" if not any(data[2:]) else f"Werte {data[2]:02X} {data[3]:02X} {data[4]:02X} {data[5]:02X}"
     if command in {16, 17, 19, 20, 22, 23, 24}:
