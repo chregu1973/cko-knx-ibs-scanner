@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>CKO KNX IBS Scanner</title>
     <link rel="icon" href="/static/cko-toolbox-logo.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=1.0.0" />
-    <link rel="stylesheet" href="/static/connection.css?v=1.0.0" />
-    <link rel="stylesheet" href="/static/branding.css?v=1.0.0" />
-    <link rel="stylesheet" href="/static/sco.css?v=1.0.0" />
+    <link rel="stylesheet" href="/static/styles.css?v=1.0.1" />
+    <link rel="stylesheet" href="/static/connection.css?v=1.0.1" />
+    <link rel="stylesheet" href="/static/branding.css?v=1.0.1" />
+    <link rel="stylesheet" href="/static/sco.css?v=1.0.1" />
   </head>
   <body>
     <aside class="sidebar">
@@ -21,7 +21,7 @@
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
         <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
       </nav>
-      <div class="sidebar-version"><span>Installierte Version</span><strong>KNX IBS Scanner 1.0.0</strong></div>
+      <div class="sidebar-version"><span>Installierte Version</span><strong>KNX IBS Scanner 1.0.1</strong></div>
       <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
       <a class="return-button" href="https://toolbox.ckoeppen.ch/">← Zurück zur Toolbox</a>
     </aside>
@@ -194,6 +194,7 @@
               <button type="button" class="active" data-sco-mode="drive">Beschattungsposition</button>
               <button type="button" data-sco-mode="operation">Lokalbedienung</button>
               <button type="button" data-sco-mode="safety">Sicherheit</button>
+              <button type="button" data-sco-mode="release">Freigabe</button>
               <button type="button" data-sco-mode="raw">Rohtelegramm</button>
             </div>
             <div class="sco-form" data-mode="drive">
@@ -212,6 +213,10 @@
               <label>Sperre<select id="sco-lock"><option value="taste" selected>Lokalbedienung sperren (wie Zentrale)</option><option value="fahrbefehl">Fahrbefehlssperre</option><option value="beide">Fahrbefehlssperre und Lokalbedienung (einzeln)</option></select></label>
               <label class="check wide"><input id="sco-allow-protected" type="checkbox" /> Sicherheitsbefehle freigeben – ich teste an der Simulation der Zentrale oder einem Testsektor</label>
               <p class="field-hint wide">Ablauf wie die Zentrale: Setzen = Lokalbedienung sperren, danach Fahrbefehl mit gewählter Priorität. Aufheben = Fahrbefehlssperre löschen und Lokalbedienung freigeben.</p>
+            </div>
+            <div class="sco-form" data-mode="release" hidden>
+              <label class="wide">Sperren löschen<select id="sco-release-lock"><option value="beide" selected>Fahrbefehlssperre und Lokalbedienung (wie Zentrale)</option><option value="fahrbefehl">Nur Fahrbefehlssperre</option><option value="taste">Nur Lokalbedienung</option></select></label>
+              <p class="field-hint wide">Einfache Freigabe wie die Zentrale, wenn die Sicherheit nicht mehr aktiv ist: Es werden nur die Sperren gelöscht, ohne Fahrbefehl. Dafür ist keine Freigabe für Sicherheitsbefehle nötig.</p>
             </div>
             <div class="sco-form" data-mode="raw" hidden>
               <label class="wide">6 Byte hex (z. B. aus dem Mitschnitt)<input id="sco-raw" placeholder="47 04 63 04 00 00" autocomplete="off" /></label>
@@ -254,7 +259,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/app.js?v=1.0.0"></script>
-    <script src="/static/sco.js?v=1.0.0"></script>
+    <script src="/static/app.js?v=1.0.1"></script>
+    <script src="/static/sco.js?v=1.0.1"></script>
   </body>
 </html>

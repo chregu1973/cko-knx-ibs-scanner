@@ -3,6 +3,10 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.0.1
+
+- **Neuer Reiter «Freigabe»** auf der Seite SCO-Objekt: einfache Freigabe wie die Zentrale, wenn die Sicherheit nicht mehr aktiv ist. Es werden nur die Sperren gelöscht (Fahrbefehlssperre und Lokalbedienung oder einzeln), ohne Fahrbefehl und ohne Freigabe für Sicherheitsbefehle.
+
 ## Version 1.0.0
 
 Erste stabile Version mit SCO-Objekt. Alle sendbaren Befehle sind am Bus mit einer Beschattungszentrale und der ETS-App geprüft (28.09.2026):

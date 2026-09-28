@@ -342,6 +342,16 @@ async def sco_safety(request: SCOSpecRequest) -> dict:
             for step, frames in sequence.items()}
 
 
+@app.post("/api/sco/release")
+async def sco_release(request: SCOSpecRequest) -> dict:
+    """Vorschau der einfachen Freigabe (Sperren löschen wie die Zentrale)."""
+    try:
+        frames = sco.release_sequence(request.spec)
+    except (sco.SCOError, TypeError, ValueError) as exc:
+        raise _sco_error(exc) from exc
+    return {"release": [{"hex": sco.to_hex(frame), "decoded": sco.decode(frame)} for frame in frames]}
+
+
 @app.post("/api/sco/send")
 async def sco_send(request: SCOSendRequest) -> dict:
     if not request.confirmed:
