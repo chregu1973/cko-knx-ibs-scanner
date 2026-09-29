@@ -55,7 +55,7 @@ function scoUpdateTargetFields() {
 }
 
 function frameRows(frames) {
-  return frames.map(({hex, decoded}) => `<tr><td class="monitor-raw">${escapeHtml(hex)}</td><td>${escapeHtml(decoded.target)}</td><td>${escapeHtml(decoded.command)}</td><td>${escapeHtml(decoded.priority || "—")}${decoded.priority_confirmed === false ? ' <span class="sco-assumed" title="Lage der Priorität bei der Sperre ist noch nicht am Bus bestätigt">Annahme</span>' : ""}</td><td>${escapeHtml(decoded.action || "—")}</td></tr>`).join("");
+  return frames.map(({hex, decoded}) => `<tr><td class="monitor-raw">${escapeHtml(hex)}</td><td>${escapeHtml(decoded.target)}</td><td>${escapeHtml(decoded.command)}${decoded.command_confirmed === false ? ' <span class="sco-assumed" title="Datenbelegung dieses Befehls ist noch nicht mit der ETS-App bestätigt">Annahme</span>' : ""}</td><td>${escapeHtml(decoded.priority || "—")}${decoded.priority_confirmed === false ? ' <span class="sco-assumed" title="Lage der Priorität bei der Sperre ist noch nicht am Bus bestätigt">Annahme</span>' : ""}</td><td>${escapeHtml(decoded.action || "—")}</td></tr>`).join("");
 }
 
 function renderSCOPreview() {
@@ -173,7 +173,7 @@ function renderSCOCapture() {
     const match = preview.has(decoded.hex) ? '<br><span class="sco-match">= Vorschau</span>' : "";
     const origin = telegram.origin ? escapeHtml(telegram.origin) : "Bus";
     const ga = telegram.group_name ? `${telegram.destination} · ${telegram.group_name}` : telegram.destination;
-    return `<tr class="${decoded.protected ? "sco-protected" : ""}"><td>${escapeHtml(time)}</td><td>${origin}${match}</td><td>${escapeHtml(telegram.source)}</td><td>${escapeHtml(ga)}</td><td>${escapeHtml(decoded.target)}</td><td>${escapeHtml(decoded.command)}</td><td>${escapeHtml(decoded.priority || "—")}${decoded.priority_confirmed === false ? ' <span class="sco-assumed">Annahme</span>' : ""}</td><td>${escapeHtml(decoded.action || "—")}</td><td class="monitor-raw">${escapeHtml(decoded.hex)}</td><td><button type="button" class="secondary compact" data-sco-replay="${escapeHtml(decoded.hex)}" data-sco-ga="${escapeHtml(telegram.destination)}">Übernehmen</button></td></tr>`;
+    return `<tr class="${decoded.protected ? "sco-protected" : ""}"><td>${escapeHtml(time)}</td><td>${origin}${match}</td><td>${escapeHtml(telegram.source)}</td><td>${escapeHtml(ga)}</td><td>${escapeHtml(decoded.target)}</td><td>${escapeHtml(decoded.command)}${decoded.command_confirmed === false ? ' <span class="sco-assumed" title="Datenbelegung dieses Befehls ist noch nicht mit der ETS-App bestätigt">Annahme</span>' : ""}</td><td>${escapeHtml(decoded.priority || "—")}${decoded.priority_confirmed === false ? ' <span class="sco-assumed">Annahme</span>' : ""}</td><td>${escapeHtml(decoded.action || "—")}</td><td class="monitor-raw">${escapeHtml(decoded.hex)}</td><td><button type="button" class="secondary compact" data-sco-replay="${escapeHtml(decoded.hex)}" data-sco-ga="${escapeHtml(telegram.destination)}">Übernehmen</button></td></tr>`;
   }).join("");
 }
 
