@@ -6,6 +6,7 @@ KNX/IP- und KNX-USB-Diagnose.
 ## Version 1.0.2
 
 - SCO-Objekt: **ETS-Aufzeichnung importieren** – «Telegramme speichern» (XML) oder Gruppenmonitor-Export (CSV) lokal auswerten. Übernommen werden nur Gruppentelegramme mit genau 6 Datenbyte; sie erscheinen mit Herkunft «Import: Dateiname» im Mitschnitt, in der Sektorübersicht und im Export.
+- Sidebar: noch nicht verfügbare Bereiche (Gebäude, Prüfungen, Protokoll) vorerst ausgeblendet; Versionsanzeige kommt aus dem laufenden Dienst.
 - Optionen: Mitschnitt vor dem Import leeren, nur markierte SCO-Gruppenadressen übernehmen. GA-Namen aus einem geladenen ETS-Projekt werden ergänzt.
 - Sektorübersicht unabhängig von der physikalischen Adresse: eine Zeile je GA, Sektor und Herkunft (Bus, Import, IBS-Test); Quelladressen und Prioritäten werden mit ihren Quellen aufgelistet, weil sich Adressen je Tunnel oder nach Neuadressierung ändern.
 - Dekodierung Byte für Byte mit den GPA-Auswertungen der Testaufzeichnungen abgeglichen.

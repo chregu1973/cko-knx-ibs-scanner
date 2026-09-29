@@ -820,3 +820,7 @@ byId("shutdown-dialog").addEventListener("close", async () => {
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[char]);
 }
+// Versionsanzeige in der Sidebar immer aus dem laufenden Dienst
+fetch("/api/health").then((response) => response.json()).then(({version}) => {
+  if (version) byId("sidebar-version").textContent = `KNX IBS Scanner ${version}`;
+}).catch(() => {});

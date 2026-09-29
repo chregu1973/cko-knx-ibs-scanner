@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>CKO KNX IBS Scanner</title>
     <link rel="icon" href="/static/cko-toolbox-logo.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=1.0.1" />
-    <link rel="stylesheet" href="/static/connection.css?v=1.0.1" />
-    <link rel="stylesheet" href="/static/branding.css?v=1.0.1" />
-    <link rel="stylesheet" href="/static/sco.css?v=1.0.1" />
+    <link rel="stylesheet" href="/static/styles.css?v=1.0.2" />
+    <link rel="stylesheet" href="/static/connection.css?v=1.0.2" />
+    <link rel="stylesheet" href="/static/branding.css?v=1.0.2" />
+    <link rel="stylesheet" href="/static/sco.css?v=1.0.2" />
   </head>
   <body>
     <aside class="sidebar">
@@ -17,11 +17,11 @@
         <button id="overview-nav" class="nav-item active" type="button" data-view="overview">⌂ <span>Übersicht</span></button>
         <button id="monitor-nav" class="nav-item" type="button" data-view="monitor">↯ <span>Gruppenmonitor</span></button>
         <button id="sco-nav" class="nav-item" type="button" data-view="sco">⇅ <span>SCO-Objekt</span></button>
-        <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▦ <span>Gebäude<small>folgt</small></span></button>
-        <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
-        <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
+        <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">▦ <span>Gebäude<small>folgt</small></span></button>
+        <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
+        <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
       </nav>
-      <div class="sidebar-version"><span>Installierte Version</span><strong>KNX IBS Scanner 1.0.1</strong></div>
+      <div class="sidebar-version"><span>Installierte Version</span><strong id="sidebar-version">KNX IBS Scanner 1.0.2</strong></div>
       <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
       <a class="return-button" href="https://toolbox.ckoeppen.ch/">← Zurück zur Toolbox</a>
     </aside>
@@ -265,7 +265,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/app.js?v=1.0.1"></script>
-    <script src="/static/sco.js?v=1.0.1"></script>
+    <script src="/static/app.js?v=1.0.2"></script>
+    <script src="/static/sco.js?v=1.0.2"></script>
   </body>
 </html>
