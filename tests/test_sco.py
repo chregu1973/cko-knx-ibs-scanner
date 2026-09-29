@@ -332,10 +332,14 @@ def test_confirmed_limit_command_decodes_ranges() -> None:
 
 
 def test_unconfirmed_command_shows_raw_parameters_instead_of_guessing() -> None:
-    # Befehl 23 kommt in einer Anlage vor dem Grenzbefehl; Belegung ist noch nicht bestätigt
+    # Befehl 23: ETS-App «Grenzen Automatik Lokalbedienung: Beschattungsposition frei von P0 bis …» (Ende abgeschnitten)
     result = decode(parse_hex("05 5C 00 01 00 00"))
     assert result["target"] == "Sektor 3"
     assert result["command_code"] == 23
+    assert result["command"] == "Grenzen Automatik Lokalbedienung"
     assert result["command_confirmed"] is False
-    assert result["action"] == "Parameter 00 01 00 00 · Belegung unbestätigt"
+    assert result["action"] == "Beschattungsposition frei von P0 bis P1"
+    unknown = decode(parse_hex("01 60 00 01 00 00"))  # Befehl 24
+    assert unknown["command_confirmed"] is False
+    assert unknown["action"] == "Parameter 00 01 00 00 · Belegung unbestätigt"
     assert decode(parse_hex("05 04 03 01 00 00"))["command_confirmed"] is True

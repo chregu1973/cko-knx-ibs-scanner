@@ -25,14 +25,18 @@ COMMANDS = {
     1: "Fahrbefehl", 2: "Wertkorrektur", 3: "Automatikzustand", 4: "Sperre setzen/löschen",
     5: "Lokalbedienung", 6: "Szene setzen", 7: "Spezialbefehl", 8: "Datum", 9: "Zeit synchronisieren",
     10: "Sensorwert-Meldung", 11: "Busüberwachung",
-    # 16, 19 und 22 sind mit der ETS-App bestätigt; 17, 20, 23 und 24 nach KNXUltimate
-    16: "Grenzen Sicherheit", 17: "Fahrbereichsgrenzen Sicherheitsfahrbefehle",
-    19: "Grenzen Sicherheit Lokalbedienung", 20: "Fahrbereichsgrenzen Sicherheitsfahrbefehle",
-    22: "Grenzen Automatik Lokalbedienung", 23: "Fahrbereichsgrenzen Automatikfahrbefehle",
+    # 16/17, 19/20, 22/23: je Winkel/Höhe und Beschattungsposition. 16, 19, 22 und 23 mit der ETS-App gesehen
+    # (23 = «Grenzen Automatik Lokalbedienung: Beschattungsposition frei von P0 bis …», 29.09.2026);
+    # 17 und 20 nach diesem Muster abgeleitet, 24 nach KNXUltimate
+    16: "Grenzen Sicherheit", 17: "Grenzen Sicherheit",
+    19: "Grenzen Sicherheit Lokalbedienung", 20: "Grenzen Sicherheit Lokalbedienung",
+    22: "Grenzen Automatik Lokalbedienung", 23: "Grenzen Automatik Lokalbedienung",
     24: "Fahrbereichsgrenzen Automatikfahrbefehle",
 }
 # Grenzen mit Winkel/Höhe von–bis (P1–P4), mit der ETS-App bestätigt
 RANGE_COMMANDS = {16, 19, 22}
+# Grenzen der Beschattungspositionen P{P1} bis P{P2}; Ende der ETS-App-Anzeige für 23 noch nicht gesichert
+POSITION_RANGE_COMMANDS = {17, 20, 23}
 # Befehle, deren Datenbelegung mit der ETS-App oder am Bus bestätigt ist
 CONFIRMED_COMMANDS = {1, 4, 5, 11} | RANGE_COMMANDS
 PRIORITIES = {0: "Grenzbefehl", 1: "Automatikbefehl", 3: "Prioritätsbefehl", 4: "Warnbefehl",
@@ -224,6 +228,8 @@ def _action(command: int, data: bytes) -> str:
         return "inaktiv" if not any(data[2:]) else f"Werte {data[2]:02X} {data[3]:02X} {data[4]:02X} {data[5]:02X}"
     if command in RANGE_COMMANDS:
         return f"Winkel frei von {data[2]} bis {data[3]} · Höhe frei von {data[4]} bis {data[5]}"
+    if command in POSITION_RANGE_COMMANDS:
+        return f"Beschattungsposition frei von P{data[2]} bis P{data[3]}"
     if command in COMMANDS:
         # Belegung nicht mit der ETS-App bestätigt: Rohwerte statt einer geratenen Deutung
         return f"Parameter {data[2]:02X} {data[3]:02X} {data[4]:02X} {data[5]:02X} · Belegung unbestätigt"
