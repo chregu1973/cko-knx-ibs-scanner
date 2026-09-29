@@ -8,9 +8,11 @@ import os
 import subprocess
 import sys
 import tempfile
+import webbrowser
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response
@@ -563,6 +565,28 @@ def sco_export_reveal(request: SCORevealRequest) -> dict:
         return {"opened": False, "path": str(target)}
     subprocess.Popen(["explorer", f"/select,{target}"])
     return {"opened": True, "path": str(target)}
+
+
+class ExternalLinkRequest(BaseModel):
+    target: str
+
+
+def external_links() -> dict[str, str]:
+    """Feste Ziele, die im Standardbrowser statt im Programmfenster geöffnet werden."""
+    feedback = urlencode({"tool": "KNX IBS Scanner", "version": __version__, "page": f"KNX IBS Scanner {__version__} (Windows)"})
+    return {
+        "feedback": f"https://feedback.toolbox.ckoeppen.ch/?{feedback}",
+        "toolbox": "https://toolbox.ckoeppen.ch/",
+    }
+
+
+@app.post("/api/open-external")
+def open_external(request: ExternalLinkRequest) -> dict:
+    """Feedback-Formular oder Toolbox im Standardbrowser öffnen; das Programmfenster bleibt beim Scanner."""
+    url = external_links().get(request.target)
+    if url is None:
+        raise HTTPException(status_code=400, detail="Unbekanntes Linkziel.")
+    return {"opened": bool(webbrowser.open(url)), "url": url}
 
 
 @app.get("/")

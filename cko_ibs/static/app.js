@@ -824,3 +824,15 @@ function escapeHtml(value) {
 fetch("/api/health").then((response) => response.json()).then(({version}) => {
   if (version) byId("sidebar-version").textContent = `KNX IBS Scanner ${version}`;
 }).catch(() => {});
+
+// Feedback und Toolbox im Standardbrowser öffnen; ein normaler Link würde das Programmfenster ersetzen
+document.querySelectorAll("[data-external]").forEach((link) => link.addEventListener("click", async (event) => {
+  event.preventDefault();
+  try {
+    const response = await fetch("/api/open-external", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({target: link.dataset.external})});
+    const result = await response.json();
+    if (!response.ok || !result.opened) window.open(result.url || link.href, "_blank", "noopener");
+  } catch {
+    window.open(link.href, "_blank", "noopener");
+  }
+}));

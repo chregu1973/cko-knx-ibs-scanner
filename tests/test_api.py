@@ -183,3 +183,13 @@ def test_secure_connection_requires_credentials() -> None:
         data={"gateway_ip": "192.168.1.20"},
     )
     assert response.status_code == 400
+
+
+def test_open_external_uses_fixed_feedback_link(monkeypatch) -> None:
+    opened = []
+    monkeypatch.setattr("cko_ibs.main.webbrowser.open", lambda url: opened.append(url) or True)
+    response = client.post("/api/open-external", json={"target": "feedback"})
+    assert response.status_code == 200
+    assert response.json()["opened"] is True
+    assert opened[0].startswith("https://feedback.toolbox.ckoeppen.ch/?tool=KNX+IBS+Scanner&version=")
+    assert client.post("/api/open-external", json={"target": "https://example.com"}).status_code == 400

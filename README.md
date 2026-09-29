@@ -3,6 +3,11 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.0.4
+
+- Sidebar: Button «Fehler oder Idee melden» öffnet das Feedback-Formular der CKO Toolbox im Standardbrowser – Tool und Version sind bereits eingetragen.
+- «Zurück zur Toolbox» öffnet ebenfalls den Standardbrowser, statt das Programmfenster zu ersetzen.
+
 ## Version 1.0.3
 
 - SCO-Objekt: Befehl 23 mit der ETS-App bestätigt – «Grenzen Automatik Lokalbedienung: Beschattungsposition frei von P0 bis P1» (P1 = von, P2 = bis). Vorher wurden die Parameter fälschlich als Winkel/Höhe gelesen.
