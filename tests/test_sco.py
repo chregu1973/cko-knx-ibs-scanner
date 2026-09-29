@@ -191,7 +191,7 @@ def test_monitor_decodes_sco_telegrams_and_builds_sector_overview() -> None:
     suggestions = client.get("/api/sco/addresses").json()["suggestions"]
     assert [row["address"] for row in suggestions] == ["8/0/0"]
     (row,) = client.get("/api/sco/sectors").json()["sectors"]
-    assert row["target"] == "Sektor 36" and row["count"] == 2 and row["source"] == "1.1.10"
+    assert row["target"] == "Sektor 36" and row["count"] == 2 and row["sources"] == {"1.1.10": 2}
     assert row["priorities"] == {"Prioritätsbefehl": 1}
     csv_text = client.get("/api/sco/export?format=csv").text
     assert "47 04 63 04 00 00" in csv_text and "Beschattungsposition P4" in csv_text

@@ -50,6 +50,11 @@
   color: #ffffff;
 }
 
+/* Geplante Bereiche sind vorerst ausgeblendet (hidden); .nav-item setzt sonst display:flex */
+.nav-item[hidden] {
+  display: none;
+}
+
 .nav-item.planned {
   opacity: .42;
   cursor: not-allowed;

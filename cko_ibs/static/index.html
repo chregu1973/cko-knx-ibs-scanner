@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>CKO KNX IBS Scanner</title>
     <link rel="icon" href="/static/cko-toolbox-logo.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=1.0.1" />
-    <link rel="stylesheet" href="/static/connection.css?v=1.0.1" />
-    <link rel="stylesheet" href="/static/branding.css?v=1.0.1" />
-    <link rel="stylesheet" href="/static/sco.css?v=1.0.1" />
+    <link rel="stylesheet" href="/static/styles.css?v=1.0.2" />
+    <link rel="stylesheet" href="/static/connection.css?v=1.0.2" />
+    <link rel="stylesheet" href="/static/branding.css?v=1.0.2" />
+    <link rel="stylesheet" href="/static/sco.css?v=1.0.2" />
   </head>
   <body>
     <aside class="sidebar">
@@ -17,11 +17,11 @@
         <button id="overview-nav" class="nav-item active" type="button" data-view="overview">⌂ <span>Übersicht</span></button>
         <button id="monitor-nav" class="nav-item" type="button" data-view="monitor">↯ <span>Gruppenmonitor</span></button>
         <button id="sco-nav" class="nav-item" type="button" data-view="sco">⇅ <span>SCO-Objekt</span></button>
-        <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▦ <span>Gebäude<small>folgt</small></span></button>
-        <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
-        <button class="nav-item planned" disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
+        <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">▦ <span>Gebäude<small>folgt</small></span></button>
+        <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
+        <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
       </nav>
-      <div class="sidebar-version"><span>Installierte Version</span><strong>KNX IBS Scanner 1.0.1</strong></div>
+      <div class="sidebar-version"><span>Installierte Version</span><strong id="sidebar-version">KNX IBS Scanner 1.0.2</strong></div>
       <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
       <a class="return-button" href="https://toolbox.ckoeppen.ch/">← Zurück zur Toolbox</a>
     </aside>
@@ -234,17 +234,23 @@
               <button id="sco-monitor-button" class="primary" type="button">Mitschnitt starten</button>
               <button id="sco-export-json" class="secondary" type="button">Export JSON</button>
               <button id="sco-export-csv" class="secondary" type="button">Export CSV</button>
+              <button id="sco-import-button" class="secondary" type="button">ETS-Aufzeichnung importieren</button>
               <button id="sco-clear-button" class="secondary" type="button">Mitschnitt löschen</button>
+              <input id="sco-import-file" type="file" accept=".xml,.csv,.txt" hidden />
             </div>
           </div>
+          <div class="sco-import-options">
+            <label class="check"><input id="sco-import-replace" type="checkbox" /> Mitschnitt vor dem Import leeren</label>
+            <label class="check"><input id="sco-import-marked" type="checkbox" /> nur markierte SCO-Gruppenadressen</label>
+          </div>
           <p id="sco-export-message" class="message"></p>
-          <p class="field-hint">SCO-Telegramme werden auf markierten Gruppenadressen und auf Adressen ohne Standard-DPT dekodiert. «= Vorschau» zeigt, dass ein Telegramm Byte für Byte der aktuellen Vorschau entspricht.</p>
+          <p class="field-hint">SCO-Telegramme werden auf markierten Gruppenadressen und auf Adressen ohne Standard-DPT dekodiert. «= Vorschau» zeigt, dass ein Telegramm Byte für Byte der aktuellen Vorschau entspricht. Import: in der ETS «Telegramme speichern» (XML) oder den Gruppenmonitor als CSV exportieren – übernommen werden nur Gruppentelegramme mit genau 6 Byte, alles bleibt lokal.</p>
           <div class="monitor-table-wrap"><table class="monitor-table sco-table"><thead><tr><th>Zeit</th><th>Herkunft</th><th>Von</th><th>GA</th><th>Ziel</th><th>Befehl</th><th>Priorität</th><th>Aktion</th><th>Hex</th><th></th></tr></thead><tbody id="sco-body"><tr class="monitor-empty"><td colspan="10">Verbinden und Mitschnitt starten.</td></tr></tbody></table></div>
         </section>
         <section class="panel sco-capture">
           <div class="panel-heading"><h2>4 · Sektorübersicht</h2><button id="sco-sectors-button" class="secondary" type="button">Aktualisieren</button></div>
-          <p class="field-hint">Welche Sektoren auf welcher Gruppenadresse von welcher Quelle mit welchen Befehlen und Prioritäten angesprochen werden – so lassen sich Sektornummern und die Priorität der Zentrale ermitteln.</p>
-          <div class="monitor-table-wrap"><table class="monitor-table"><thead><tr><th>GA</th><th>Ziel</th><th>Quelle</th><th>Anzahl</th><th>Befehle</th><th>Prioritäten</th><th>Zuletzt</th></tr></thead><tbody id="sco-sectors-body"><tr class="monitor-empty"><td colspan="7">Noch keine SCO-Telegramme.</td></tr></tbody></table></div>
+          <p class="field-hint">Welche Sektoren auf welcher Gruppenadresse mit welchen Befehlen und Prioritäten angesprochen werden (je Herkunft Bus, Import, IBS-Test; physikalische Adressen werden nur aufgelistet, weil sie sich je Tunnel oder nach Neuadressierung ändern können) – so lassen sich Sektornummern und die Priorität der Zentrale ermitteln.</p>
+          <div class="monitor-table-wrap"><table class="monitor-table"><thead><tr><th>GA</th><th>Ziel</th><th>Herkunft · Quellen</th><th>Anzahl</th><th>Befehle</th><th>Prioritäten</th><th>Zuletzt</th></tr></thead><tbody id="sco-sectors-body"><tr class="monitor-empty"><td colspan="7">Noch keine SCO-Telegramme.</td></tr></tbody></table></div>
         </section>
       </div>
     </main>
@@ -259,7 +265,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/app.js?v=1.0.1"></script>
-    <script src="/static/sco.js?v=1.0.1"></script>
+    <script src="/static/app.js?v=1.0.2"></script>
+    <script src="/static/sco.js?v=1.0.2"></script>
   </body>
 </html>

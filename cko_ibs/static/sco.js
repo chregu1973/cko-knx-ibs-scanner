@@ -181,7 +181,9 @@ async function renderSCOSectors() {
   try {
     const {sectors} = await scoApi("/api/sco/sectors");
     const summary = (counts) => Object.entries(counts).map(([name, count]) => `${escapeHtml(name)} ×${count}`).join(", ") || "—";
-    byId("sco-sectors-body").innerHTML = sectors.length ? sectors.map((row) => `<tr><td>${escapeHtml(row.group_name ? `${row.group_address} · ${row.group_name}` : row.group_address)}</td><td>${escapeHtml(row.target)}</td><td>${escapeHtml(row.source)}</td><td>${row.count}</td><td>${summary(row.commands)}</td><td>${summary(row.priorities)}</td><td>${escapeHtml(row.last_action)}</td></tr>`).join("") : '<tr class="monitor-empty"><td colspan="7">Noch keine SCO-Telegramme.</td></tr>';
+    const priorities = (row) => Object.entries(row.priorities).map(([name, count]) => `${escapeHtml(name)} ×${count} <small>(${escapeHtml((row.priority_sources?.[name] || []).join(", "))})</small>`).join("<br>") || "—";
+    const origin = {bus: "Bus", Import: "Import", "IBS-Test": "IBS-Test"};
+    byId("sco-sectors-body").innerHTML = sectors.length ? sectors.map((row) => `<tr><td>${escapeHtml(row.group_name ? `${row.group_address} · ${row.group_name}` : row.group_address)}</td><td>${escapeHtml(row.target)}</td><td><strong>${escapeHtml(origin[row.origin] || row.origin)}</strong><br><small>${summary(row.sources || {[row.source]: row.count})}</small></td><td>${row.count}</td><td>${summary(row.commands)}</td><td>${priorities(row)}</td><td>${escapeHtml(row.last_action)}</td></tr>`).join("") : '<tr class="monitor-empty"><td colspan="7">Noch keine SCO-Telegramme.</td></tr>';
   } catch (error) {
     byId("sco-sectors-body").innerHTML = `<tr class="monitor-empty"><td colspan="7">${escapeHtml(error.message)}</td></tr>`;
   }
@@ -256,6 +258,44 @@ async function scoExport(format) {
   }
 }
 
+function scoImportedTelegram(entry) {
+  const decoded = entry.decoded;
+  return {...entry, sco: decoded, imported: true,
+    value: `${decoded.target} · ${decoded.command}${decoded.priority ? ` · ${decoded.priority}` : ""}${decoded.action ? ` · ${decoded.action}` : ""}`};
+}
+
+async function scoImport(file) {
+  const message = byId("sco-export-message");
+  message.className = "message";
+  message.textContent = `${file.name} wird ausgewertet …`;
+  const form = new FormData();
+  form.append("recording", file);
+  form.append("replace", byId("sco-import-replace").checked ? "true" : "false");
+  form.append("only_marked", byId("sco-import-marked").checked ? "true" : "false");
+  try {
+    const response = await fetch("/api/sco/import", {method: "POST", body: form});
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.detail || `HTTP ${response.status}`);
+    if (byId("sco-import-replace").checked) monitorTelegrams = monitorTelegrams.filter((telegram) => !telegram.sco);
+    monitorTelegrams.push(...result.entries.map(scoImportedTelegram));
+    monitorTelegrams.sort((a, b) => String(b.time).localeCompare(String(a.time)));
+    renderSCOCapture(); renderSCOSectors();
+    const addresses = result.addresses.length ? ` auf ${result.addresses.join(", ")}` : "";
+    message.className = result.imported ? "message success" : "message";
+    message.textContent = `${result.file}: ${result.frames} Telegramme gelesen, ${result.group_telegrams} Gruppentelegramme, ${result.imported} SCO-Telegramme (6 Byte) übernommen${addresses}.`
+      + (result.truncated ? ` Die ältesten ${result.truncated} passen nicht in den Mitschnitt (max. 5000).` : "");
+  } catch (error) {
+    message.className = "message error";
+    message.textContent = `Import fehlgeschlagen: ${error.message}`;
+  }
+}
+
+byId("sco-import-button").addEventListener("click", () => byId("sco-import-file").click());
+byId("sco-import-file").addEventListener("change", (event) => {
+  const [file] = event.target.files;
+  if (file) scoImport(file);
+  event.target.value = "";
+});
 byId("sco-export-json").addEventListener("click", () => scoExport("json"));
 byId("sco-export-csv").addEventListener("click", () => scoExport("csv"));
 

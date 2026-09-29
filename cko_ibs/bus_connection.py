@@ -424,6 +424,10 @@ class BusConnection:
         return [row for address, row in sorted(self._group_addresses.items())
                 if SCO_NAME_HINT.search(str(row.get("name") or ""))]
 
+    def group_names(self) -> dict[str, str | None]:
+        """GA-Bezeichnungen aus dem geladenen ETS-Projekt (für importierte Aufzeichnungen)."""
+        return {address: row.get("name") for address, row in self._group_addresses.items()}
+
     @property
     def sco_addresses(self) -> list[str]:
         return sorted(self._sco_addresses)

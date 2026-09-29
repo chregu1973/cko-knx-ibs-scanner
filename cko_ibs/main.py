@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from cko_ibs import __version__, sco
+from cko_ibs import __version__, sco, sco_import
 from cko_ibs.bus_connection import bus_connection
 from cko_ibs.knx_discovery import discover_gateways, network_adapters
 from cko_ibs.project_reader import read_project
@@ -398,22 +398,74 @@ async def clear_sco_log() -> dict:
     return {"entries": [], "size": 0}
 
 
+@app.post("/api/sco/import")
+async def sco_import_recording(
+    recording: Annotated[UploadFile, File()],
+    replace: Annotated[bool, Form()] = False,
+    only_marked: Annotated[bool, Form()] = False,
+) -> dict:
+    """ETS-Aufzeichnung (XML oder Gruppenmonitor-CSV) lokal auswerten, nur 6-Byte-Gruppentelegramme."""
+    filename = Path(recording.filename or "aufzeichnung").name
+    payload = await recording.read(sco_import.MAX_IMPORT_BYTES+1)
+    try:
+        frames = sco_import.read_recording(filename, payload)
+    except sco_import.ImportError_ as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = sco_import.sco_entries(filename, frames, bus_connection.group_names())
+    entries = result["entries"]
+    if only_marked:
+        entries = [entry for entry in entries if entry["destination"] in bus_connection.sco_addresses]
+    if replace:
+        bus_connection.sco_log.clear()
+    limit = bus_connection.sco_log.maxlen or len(entries)
+    for entry in entries:
+        bus_connection.sco_log.append(entry)
+    return {
+        "file": filename, "frames": result["frames"], "group_telegrams": result["group_telegrams"],
+        "imported": len(entries), "truncated": max(0, len(entries)-limit),
+        "addresses": sorted({entry["destination"] for entry in entries}),
+        "entries": entries[-limit:], "size": len(bus_connection.sco_log),
+    }
+
+
+def _origin_group(origin: str) -> str:
+    if origin.startswith("IBS-Test"):
+        return "IBS-Test"
+    return "Import" if origin.startswith("Import") else "bus"
+
+
 def _sector_overview(entries: list[dict]) -> list[dict]:
+    """Je GA, Sektor und Herkunft eine Zeile.
+
+    Die physikalische Adresse ist kein Schlüssel: Tunnel (ETS, IBS) vergeben je Verbindung andere Adressen und Geräte
+    können neu adressiert werden. Die Quellen werden deshalb pro Zeile mit Anzahl aufgeführt, Prioritäten mit ihren Quellen.
+    """
     overview: dict[tuple, dict] = {}
     for entry in entries:
         decoded = entry["decoded"]
-        key = (entry["destination"], decoded["target"], entry["source"])
-        row = overview.setdefault(key, {
+        origin = _origin_group(str(entry.get("origin", "")))
+        source = str(entry.get("source") or "?")
+        row = overview.setdefault((entry["destination"], decoded["target"], origin), {
             "group_address": entry["destination"], "group_name": entry.get("group_name"),
-            "target": decoded["target"], "sector_from": decoded["sector_from"], "source": entry["source"],
-            "origin": "IBS-Test" if str(entry.get("origin", "")).startswith("IBS-Test") else "bus", "count": 0, "commands": {}, "priorities": {},
+            "target": decoded["target"], "sector_from": decoded["sector_from"], "source": "", "sources": {},
+            "origin": origin, "count": 0, "commands": {}, "priorities": {}, "priority_sources": {},
             "first_seen": entry["time"], "last_seen": entry["time"], "last_action": ""})
         row["count"] += 1
+        row["group_name"] = row["group_name"] or entry.get("group_name")
+        row["sources"][source] = row["sources"].get(source, 0)+1
         row["commands"][decoded["command"]] = row["commands"].get(decoded["command"], 0)+1
         if decoded["priority"]:
             row["priorities"][decoded["priority"]] = row["priorities"].get(decoded["priority"], 0)+1
-        row["last_seen"], row["last_action"] = entry["time"], decoded["action"] or decoded["command"]
-    return sorted(overview.values(), key=lambda row: (row["group_address"], row["sector_from"], row["source"]))
+            sources = row["priority_sources"].setdefault(decoded["priority"], [])
+            if source not in sources:
+                sources.append(source)
+        row["first_seen"] = min(row["first_seen"], entry["time"])
+        if entry["time"] >= row["last_seen"]:
+            row["last_seen"], row["last_action"] = entry["time"], decoded["action"] or decoded["command"]
+    for row in overview.values():
+        row["source"] = ", ".join(row["sources"])
+    order = {"bus": 0, "Import": 1, "IBS-Test": 2}
+    return sorted(overview.values(), key=lambda row: (row["group_address"], row["sector_from"], order.get(row["origin"], 3)))
 
 
 @app.get("/api/sco/sectors")
