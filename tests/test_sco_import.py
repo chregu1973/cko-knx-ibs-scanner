@@ -146,3 +146,18 @@ def test_import_endpoint_reports_unreadable_file() -> None:
     response = TestClient(app).post("/api/sco/import", files={"recording": ("x.xml", b"<kaputt", "text/xml")})
     assert response.status_code == 422
     assert "XML" in response.json()["detail"]
+
+
+def test_sector_overview_groups_changing_physical_addresses() -> None:
+    """ETS/Tunnel senden je Verbindung mit anderer Adresse: eine Zeile, Quellen mit Anzahl."""
+    frames = [
+        {"time": "2026-09-28T22:20:17.354", "service": "L_Data.ind", "raw": "2900BCE0CCFE500A0700800104A1000000"},
+        {"time": "2026-09-28T22:43:09.445", "service": "L_Data.ind", "raw": "2900BCE011FE500A0700800104A1000000"},
+        {"time": "2026-09-28T23:09:09.614", "service": "L_Data.ind", "raw": "2900BCE01102500A0700800104C1000000"},
+    ]
+    bus_connection.sco_log.extend(sco_import.sco_entries("a.xml", frames, {})["entries"])
+    (row,) = TestClient(app).get("/api/sco/sectors").json()["sectors"]
+    assert row["origin"] == "Import" and row["count"] == 3
+    assert row["sources"] == {"12.12.254": 1, "1.1.254": 1, "1.1.2": 1}
+    assert row["priority_sources"] == {"Sicherheitsbefehl": ["12.12.254", "1.1.254"], "Gefahrenbefehl": ["1.1.2"]}
+    assert row["last_action"] == "obere Endlage"

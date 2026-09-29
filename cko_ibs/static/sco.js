@@ -181,7 +181,9 @@ async function renderSCOSectors() {
   try {
     const {sectors} = await scoApi("/api/sco/sectors");
     const summary = (counts) => Object.entries(counts).map(([name, count]) => `${escapeHtml(name)} ×${count}`).join(", ") || "—";
-    byId("sco-sectors-body").innerHTML = sectors.length ? sectors.map((row) => `<tr><td>${escapeHtml(row.group_name ? `${row.group_address} · ${row.group_name}` : row.group_address)}</td><td>${escapeHtml(row.target)}</td><td>${escapeHtml(row.source)}</td><td>${row.count}</td><td>${summary(row.commands)}</td><td>${summary(row.priorities)}</td><td>${escapeHtml(row.last_action)}</td></tr>`).join("") : '<tr class="monitor-empty"><td colspan="7">Noch keine SCO-Telegramme.</td></tr>';
+    const priorities = (row) => Object.entries(row.priorities).map(([name, count]) => `${escapeHtml(name)} ×${count} <small>(${escapeHtml((row.priority_sources?.[name] || []).join(", "))})</small>`).join("<br>") || "—";
+    const origin = {bus: "Bus", Import: "Import", "IBS-Test": "IBS-Test"};
+    byId("sco-sectors-body").innerHTML = sectors.length ? sectors.map((row) => `<tr><td>${escapeHtml(row.group_name ? `${row.group_address} · ${row.group_name}` : row.group_address)}</td><td>${escapeHtml(row.target)}</td><td><strong>${escapeHtml(origin[row.origin] || row.origin)}</strong><br><small>${summary(row.sources || {[row.source]: row.count})}</small></td><td>${row.count}</td><td>${summary(row.commands)}</td><td>${priorities(row)}</td><td>${escapeHtml(row.last_action)}</td></tr>`).join("") : '<tr class="monitor-empty"><td colspan="7">Noch keine SCO-Telegramme.</td></tr>';
   } catch (error) {
     byId("sco-sectors-body").innerHTML = `<tr class="monitor-empty"><td colspan="7">${escapeHtml(error.message)}</td></tr>`;
   }

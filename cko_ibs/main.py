@@ -435,21 +435,37 @@ def _origin_group(origin: str) -> str:
 
 
 def _sector_overview(entries: list[dict]) -> list[dict]:
+    """Je GA, Sektor und Herkunft eine Zeile.
+
+    Die physikalische Adresse ist kein Schlüssel: Tunnel (ETS, IBS) vergeben je Verbindung andere Adressen und Geräte
+    können neu adressiert werden. Die Quellen werden deshalb pro Zeile mit Anzahl aufgeführt, Prioritäten mit ihren Quellen.
+    """
     overview: dict[tuple, dict] = {}
     for entry in entries:
         decoded = entry["decoded"]
-        key = (entry["destination"], decoded["target"], entry["source"], _origin_group(str(entry.get("origin", ""))))
-        row = overview.setdefault(key, {
+        origin = _origin_group(str(entry.get("origin", "")))
+        source = str(entry.get("source") or "?")
+        row = overview.setdefault((entry["destination"], decoded["target"], origin), {
             "group_address": entry["destination"], "group_name": entry.get("group_name"),
-            "target": decoded["target"], "sector_from": decoded["sector_from"], "source": entry["source"],
-            "origin": _origin_group(str(entry.get("origin", ""))), "count": 0, "commands": {}, "priorities": {},
+            "target": decoded["target"], "sector_from": decoded["sector_from"], "source": "", "sources": {},
+            "origin": origin, "count": 0, "commands": {}, "priorities": {}, "priority_sources": {},
             "first_seen": entry["time"], "last_seen": entry["time"], "last_action": ""})
         row["count"] += 1
+        row["group_name"] = row["group_name"] or entry.get("group_name")
+        row["sources"][source] = row["sources"].get(source, 0)+1
         row["commands"][decoded["command"]] = row["commands"].get(decoded["command"], 0)+1
         if decoded["priority"]:
             row["priorities"][decoded["priority"]] = row["priorities"].get(decoded["priority"], 0)+1
-        row["last_seen"], row["last_action"] = entry["time"], decoded["action"] or decoded["command"]
-    return sorted(overview.values(), key=lambda row: (row["group_address"], row["sector_from"], row["source"]))
+            sources = row["priority_sources"].setdefault(decoded["priority"], [])
+            if source not in sources:
+                sources.append(source)
+        row["first_seen"] = min(row["first_seen"], entry["time"])
+        if entry["time"] >= row["last_seen"]:
+            row["last_seen"], row["last_action"] = entry["time"], decoded["action"] or decoded["command"]
+    for row in overview.values():
+        row["source"] = ", ".join(row["sources"])
+    order = {"bus": 0, "Import": 1, "IBS-Test": 2}
+    return sorted(overview.values(), key=lambda row: (row["group_address"], row["sector_from"], order.get(row["origin"], 3)))
 
 
 @app.get("/api/sco/sectors")
