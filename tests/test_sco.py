@@ -320,3 +320,22 @@ def test_release_api_and_sending_without_safety_release() -> None:
     response = client.post("/api/sco/send", json={"group_address": "10/0/10", "confirmed": True,
                                                    "frames": [item["hex"] for item in result["release"]]})
     assert response.status_code == 409
+
+
+def test_confirmed_limit_command_decodes_ranges() -> None:
+    # Anlage 21/0/253 und GPA-Referenz auf 10/0/10 (29.09.2026): Sektor 4, Grenzen Automatik Lokalbedienung
+    result = decode(parse_hex("07 58 00 FF 00 FF"))
+    assert result["target"] == "Sektor 4"
+    assert result["command"] == "Grenzen Automatik Lokalbedienung"
+    assert result["action"] == "Winkel frei von 0 bis 255 · Höhe frei von 0 bis 255"
+    assert result["command_confirmed"] is True
+
+
+def test_unconfirmed_command_shows_raw_parameters_instead_of_guessing() -> None:
+    # Befehl 23 kommt in einer Anlage vor dem Grenzbefehl; Belegung ist noch nicht bestätigt
+    result = decode(parse_hex("05 5C 00 01 00 00"))
+    assert result["target"] == "Sektor 3"
+    assert result["command_code"] == 23
+    assert result["command_confirmed"] is False
+    assert result["action"] == "Parameter 00 01 00 00 · Belegung unbestätigt"
+    assert decode(parse_hex("05 04 03 01 00 00"))["command_confirmed"] is True

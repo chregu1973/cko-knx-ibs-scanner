@@ -31,6 +31,10 @@ COMMANDS = {
     22: "Grenzen Automatik Lokalbedienung", 23: "Fahrbereichsgrenzen Automatikfahrbefehle",
     24: "Fahrbereichsgrenzen Automatikfahrbefehle",
 }
+# Grenzen mit Winkel/Höhe von–bis (P1–P4), mit der ETS-App bestätigt
+RANGE_COMMANDS = {16, 19, 22}
+# Befehle, deren Datenbelegung mit der ETS-App oder am Bus bestätigt ist
+CONFIRMED_COMMANDS = {1, 4, 5, 11} | RANGE_COMMANDS
 PRIORITIES = {0: "Grenzbefehl", 1: "Automatikbefehl", 3: "Prioritätsbefehl", 4: "Warnbefehl",
               5: "Sicherheitsbefehl", 6: "Gefahrenbefehl"}
 PRIORITY_KEYS = {"grenz": 0, "automatik": 1, "prioritaet": 3, "warn": 4, "sicherheit": 5, "gefahr": 6}
@@ -218,9 +222,18 @@ def _action(command: int, data: bytes) -> str:
         return f"{name} · {'mit Automatiksperre setzen' if data[2] & 0x80 else 'mit Automatiksperre löschen'}"
     if command == 11:
         return "inaktiv" if not any(data[2:]) else f"Werte {data[2]:02X} {data[3]:02X} {data[4]:02X} {data[5]:02X}"
-    if command in {16, 17, 19, 20, 22, 23, 24}:
+    if command in RANGE_COMMANDS:
         return f"Winkel frei von {data[2]} bis {data[3]} · Höhe frei von {data[4]} bis {data[5]}"
+    if command in COMMANDS:
+        # Belegung nicht mit der ETS-App bestätigt: Rohwerte statt einer geratenen Deutung
+        return f"Parameter {data[2]:02X} {data[3]:02X} {data[4]:02X} {data[5]:02X} · Belegung unbestätigt"
     return ""
+
+
+def _command_confirmed(command: int, data: bytes) -> bool:
+    if command == 2:
+        return data[2] == 0
+    return command in CONFIRMED_COMMANDS
 
 
 def decode(data: bytes | list[int]) -> dict[str, Any]:
@@ -239,6 +252,7 @@ def decode(data: bytes | list[int]) -> dict[str, Any]:
         "target": "reserviert" if code == 0 else (f"Sektor {first}" if first == last else f"Sektoren {first}–{last}"),
         "command_code": command,
         "command": COMMANDS.get(command, f"unbekannt ({command})"),
+        "command_confirmed": _command_confirmed(command, raw),
         "priority_code": priority,
         "priority": (PRIORITIES.get(priority, f"unbekannt ({priority})") if priority is not None else None),
         "priority_confirmed": True if priority is not None else None,
