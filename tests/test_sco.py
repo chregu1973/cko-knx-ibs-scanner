@@ -331,13 +331,16 @@ def test_confirmed_limit_command_decodes_ranges() -> None:
     assert result["command_confirmed"] is True
 
 
-def test_unconfirmed_command_shows_raw_parameters_instead_of_guessing() -> None:
-    # Befehl 23: ETS-App «Grenzen Automatik Lokalbedienung: Beschattungsposition frei von P0 bis …» (Ende abgeschnitten)
+def test_position_limits_and_unconfirmed_commands() -> None:
+    # Befehl 23: ETS-App-Referenz 07 5C 00 01 00 00 = Sektor 4 · «Beschattungsposition frei von P0 bis P1»
     result = decode(parse_hex("05 5C 00 01 00 00"))
     assert result["target"] == "Sektor 3"
     assert result["command_code"] == 23
     assert result["command"] == "Grenzen Automatik Lokalbedienung"
-    assert result["command_confirmed"] is False
+    assert result["command_confirmed"] is True
+    reference = decode(parse_hex("07 5C 00 01 00 00"))
+    assert (reference["target"], reference["action"]) == ("Sektor 4", "Beschattungsposition frei von P0 bis P1")
+    assert decode(parse_hex("01 44 00 02 00 00"))["command_confirmed"] is False  # 17 nur abgeleitet
     assert result["action"] == "Beschattungsposition frei von P0 bis P1"
     unknown = decode(parse_hex("01 60 00 01 00 00"))  # Befehl 24
     assert unknown["command_confirmed"] is False

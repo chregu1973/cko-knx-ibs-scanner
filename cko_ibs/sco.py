@@ -26,7 +26,7 @@ COMMANDS = {
     5: "Lokalbedienung", 6: "Szene setzen", 7: "Spezialbefehl", 8: "Datum", 9: "Zeit synchronisieren",
     10: "Sensorwert-Meldung", 11: "Busüberwachung",
     # 16/17, 19/20, 22/23: je Winkel/Höhe und Beschattungsposition. 16, 19, 22 und 23 mit der ETS-App gesehen
-    # (23 = «Grenzen Automatik Lokalbedienung: Beschattungsposition frei von P0 bis …», 29.09.2026);
+    # (23: 07 5C 00 01 00 00 = «Grenzen Automatik Lokalbedienung: Beschattungsposition frei von P0 bis P1», 29.09.2026);
     # 17 und 20 nach diesem Muster abgeleitet, 24 nach KNXUltimate
     16: "Grenzen Sicherheit", 17: "Grenzen Sicherheit",
     19: "Grenzen Sicherheit Lokalbedienung", 20: "Grenzen Sicherheit Lokalbedienung",
@@ -35,10 +35,10 @@ COMMANDS = {
 }
 # Grenzen mit Winkel/Höhe von–bis (P1–P4), mit der ETS-App bestätigt
 RANGE_COMMANDS = {16, 19, 22}
-# Grenzen der Beschattungspositionen P{P1} bis P{P2}; Ende der ETS-App-Anzeige für 23 noch nicht gesichert
+# Grenzen der Beschattungspositionen P{P1} bis P{P2}; 23 mit der ETS-App bestätigt, 17 und 20 abgeleitet
 POSITION_RANGE_COMMANDS = {17, 20, 23}
 # Befehle, deren Datenbelegung mit der ETS-App oder am Bus bestätigt ist
-CONFIRMED_COMMANDS = {1, 4, 5, 11} | RANGE_COMMANDS
+CONFIRMED_COMMANDS = {1, 4, 5, 11, 23} | RANGE_COMMANDS
 PRIORITIES = {0: "Grenzbefehl", 1: "Automatikbefehl", 3: "Prioritätsbefehl", 4: "Warnbefehl",
               5: "Sicherheitsbefehl", 6: "Gefahrenbefehl"}
 PRIORITY_KEYS = {"grenz": 0, "automatik": 1, "prioritaet": 3, "warn": 4, "sicherheit": 5, "gefahr": 6}
