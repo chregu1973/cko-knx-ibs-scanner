@@ -346,3 +346,12 @@ def test_position_limits_and_unconfirmed_commands() -> None:
     assert unknown["command_confirmed"] is False
     assert unknown["action"] == "Parameter 00 01 00 00 · Belegung unbestätigt"
     assert decode(parse_hex("05 04 03 01 00 00"))["command_confirmed"] is True
+
+
+def test_send_without_connection_explains_that_no_project_is_needed() -> None:
+    client = TestClient(app)
+    response = client.post("/api/sco/send", json={
+        "group_address": "10/0/10", "frames": ["01 04 21 00 00 00"], "label": "Test", "confirmed": True})
+    assert response.status_code == 409
+    assert "KNX-Verbindung" in response.json()["detail"]
+    assert "ETS-Projekt ist nicht nötig" in response.json()["detail"]

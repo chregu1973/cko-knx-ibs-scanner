@@ -472,7 +472,7 @@ class BusConnection:
     async def send_sco(self, group_address: str, frames: list[bytes], label: str = "") -> list[dict[str, Any]]:
         """6-Byte-Telegramme nacheinander als GroupValueWrite senden und protokollieren."""
         if not self.connected or self.xknx is None:
-            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst verbinden.")
+            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst unter «Übersicht» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.")
         destination = GroupAddress(group_address)
         sent = []
         for index, frame in enumerate(frames):

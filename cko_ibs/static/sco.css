@@ -38,3 +38,13 @@
 .sco-table td:nth-child(3){min-width:0;white-space:nowrap}.sco-table td:nth-child(4){min-width:170px;white-space:normal}
 .sco-import-options{display:flex;flex-wrap:wrap;gap:18px;margin:10px 0 0}
 .sco-import-options .check{display:flex;align-items:center;gap:6px;font-weight:400}
+.sco-requirement{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:0 0 18px;padding:13px 16px;border:1px solid var(--line);border-radius:10px;font-size:13px;line-height:1.5}
+.sco-requirement span{flex:1 1 420px}
+.sco-requirement.warn{border-color:#235b8c;background:#102235;color:#cfe6ff}
+.sco-requirement.warn strong{color:#7fc2ff}
+.sco-requirement.ok{border-color:#256d50;background:#10261e;color:#bfeed7}
+.sco-requirement.ok strong{color:#70e5ae}
+.sco-send-hint{margin:8px 0 0;font-size:13px}
+.sco-send-hint.warn{color:#ffb35c}
+.sco-send-hint.info{color:var(--muted)}
+.sco-send-hint.ok{color:#70e5ae}

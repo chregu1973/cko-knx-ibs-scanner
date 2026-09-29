@@ -65,11 +65,11 @@ function renderSCOPreview() {
   box.innerHTML = `${steps.map((step) => `<div class="sco-step"><h3>${escapeHtml(step.label)} → ${escapeHtml(ga)}</h3>
     <table class="monitor-table"><thead><tr><th>Hex</th><th>Ziel</th><th>Befehl</th><th>Priorität</th><th>Aktion</th></tr></thead><tbody>${frameRows(step.frames)}</tbody></table>
     <button type="button" class="${step.key === "set" ? "danger" : "primary"}" data-sco-send="${step.key}" disabled>${escapeHtml(step.button)}</button></div>`).join("")}
-    <label class="check sco-confirm"><input id="sco-confirm" type="checkbox" /> Vorschau geprüft${protectedFrames ? " – enthält Sicherheitsbefehle, Aufheben liegt bereit" : ""}</label>`;
+    <label class="check sco-confirm"><input id="sco-confirm" type="checkbox" /> Vorschau geprüft${protectedFrames ? " – enthält Sicherheitsbefehle, Aufheben liegt bereit" : ""}</label>
+    <p id="sco-send-hint" class="sco-send-hint"></p>`;
   box.hidden = false;
-  byId("sco-confirm").addEventListener("change", (event) => {
-    box.querySelectorAll("[data-sco-send]").forEach((button) => { button.disabled = !event.target.checked || !busConnected; });
-  });
+  byId("sco-confirm").addEventListener("change", scoUpdateSendState);
+  scoUpdateSendState();
   box.querySelectorAll("[data-sco-send]").forEach((button) => button.addEventListener("click", () => scoSend(button.dataset.scoSend)));
   renderSCOCapture();
 }
@@ -105,7 +105,7 @@ async function scoBuildPreview() {
     }
     const protectedFrames = steps.some((step) => step.frames.some((frame) => frame.decoded.protected));
     scoPreview = {kind: scoMode, ga, target: scoTargetLabel(target), steps, protectedFrames};
-    message.textContent = busConnected ? "Vorschau prüfen, bestätigen und senden." : "Vorschau erstellt. Zum Senden zuerst die KNX-Verbindung aufbauen.";
+    message.textContent = busConnected ? "Vorschau prüfen, bestätigen und senden." : "Vorschau erstellt.";
     renderSCOPreview();
   } catch (error) {
     scoClearPreview();
@@ -203,6 +203,36 @@ async function loadSCOAddresses() {
   }
 }
 
+// Warum Senden gerade nicht geht – deaktivierte Buttons allein reagieren nicht auf Klicks
+function scoSendBlocker() {
+  if (!busConnected) return "Senden gesperrt: keine KNX-Verbindung. Zuerst unter «Übersicht» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.";
+  if (!byId("sco-confirm")?.checked) return "Zum Senden «Vorschau geprüft» anhaken.";
+  return "";
+}
+
+function scoUpdateSendState() {
+  const blocker = scoSendBlocker();
+  byId("sco-preview").querySelectorAll("[data-sco-send]").forEach((button) => { button.disabled = Boolean(blocker); });
+  const hint = byId("sco-send-hint");
+  if (hint) {
+    hint.textContent = blocker || "Bereit zum Senden.";
+    hint.className = `sco-send-hint ${blocker ? (busConnected ? "info" : "warn") : "ok"}`;
+  }
+}
+
+function renderSCORequirement() {
+  const box = byId("sco-requirement");
+  if (!box) return;
+  const state = busConnected ? "ok" : "warn";
+  if (box.dataset.state === state) return;
+  box.dataset.state = state;
+  box.className = `sco-requirement ${state}`;
+  box.innerHTML = busConnected
+    ? "<strong>● KNX verbunden</strong><span>Telegramme können gesendet und live mitgeschnitten werden. Ein ETS-Projekt ist dafür nicht nötig.</span>"
+    : `<strong>○ Keine KNX-Verbindung</strong><span>Ohne ETS-Projekt nutzbar – <b>zum Senden und für den Live-Mitschnitt ist aber eine bestehende KNX-Verbindung nötig</b> (KNX/IP, IP Secure oder USB). Vorschau, Dekodierung und ETS-Import funktionieren auch offline.</span><button type="button" class="primary compact" id="sco-go-connect">Zur Verbindung</button>`;
+  byId("sco-go-connect")?.addEventListener("click", () => showView("overview"));
+}
+
 function updateSCOBadges() {
   const connection = byId("sco-connection-badge");
   connection.className = busConnected ? "badge good" : "badge muted";
@@ -212,7 +242,8 @@ function updateSCOBadges() {
   monitor.textContent = monitorRunning ? "● Mitschnitt aktiv" : "○ Mitschnitt aus";
   byId("sco-monitor-button").textContent = monitorRunning ? "Mitschnitt stoppen" : "Mitschnitt starten";
   byId("sco-monitor-button").className = monitorRunning ? "danger" : "primary";
-  byId("sco-preview").querySelectorAll("[data-sco-send]").forEach((button) => { button.disabled = !busConnected || !byId("sco-confirm")?.checked; });
+  scoUpdateSendState();
+  renderSCORequirement();
 }
 
 // In den bestehenden Ablauf einklinken: neue Telegramme und Ansichtswechsel

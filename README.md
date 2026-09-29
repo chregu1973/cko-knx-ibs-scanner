@@ -3,6 +3,11 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.0.5
+
+- SCO-Objekt: fester Hinweis oben in der Maske – ohne ETS-Projekt nutzbar, zum Senden und für den Live-Mitschnitt ist aber eine bestehende KNX-Verbindung nötig; mit Button «Zur Verbindung».
+- Bei den Senden-Buttons steht jetzt, warum Senden gesperrt ist (keine Verbindung oder Vorschau noch nicht bestätigt). Vorher blieb ein Klick auf den deaktivierten Button ohne Rückmeldung.
+
 ## Version 1.0.4
 
 - Sidebar: Button «Fehler oder Idee melden» öffnet das Feedback-Formular der CKO Toolbox im Standardbrowser – Tool und Version sind bereits eingetragen.
