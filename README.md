@@ -3,6 +3,12 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.0.3
+
+- SCO-Objekt: Befehl 23 mit der ETS-App bestätigt – «Grenzen Automatik Lokalbedienung: Beschattungsposition frei von P0 bis P1» (P1 = von, P2 = bis). Vorher wurden die Parameter fälschlich als Winkel/Höhe gelesen.
+- Befehle 17 und 20 nach demselben Muster (Beschattungsposition bei den Sicherheitsgrenzen), als «Annahme» markiert.
+- Nicht bestätigte Befehle zeigen die Rohparameter mit «Belegung unbestätigt» statt einer geratenen Deutung; Vorschau und Mitschnitt kennzeichnen sie mit «Annahme».
+
 ## Version 1.0.2
 
 - SCO-Objekt: **ETS-Aufzeichnung importieren** – «Telegramme speichern» (XML) oder Gruppenmonitor-Export (CSV) lokal auswerten. Übernommen werden nur Gruppentelegramme mit genau 6 Datenbyte; sie erscheinen mit Herkunft «Import: Dateiname» im Mitschnitt, in der Sektorübersicht und im Export.
