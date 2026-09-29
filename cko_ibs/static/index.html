@@ -234,11 +234,17 @@
               <button id="sco-monitor-button" class="primary" type="button">Mitschnitt starten</button>
               <button id="sco-export-json" class="secondary" type="button">Export JSON</button>
               <button id="sco-export-csv" class="secondary" type="button">Export CSV</button>
+              <button id="sco-import-button" class="secondary" type="button">ETS-Aufzeichnung importieren</button>
               <button id="sco-clear-button" class="secondary" type="button">Mitschnitt löschen</button>
+              <input id="sco-import-file" type="file" accept=".xml,.csv,.txt" hidden />
             </div>
           </div>
+          <div class="sco-import-options">
+            <label class="check"><input id="sco-import-replace" type="checkbox" /> Mitschnitt vor dem Import leeren</label>
+            <label class="check"><input id="sco-import-marked" type="checkbox" /> nur markierte SCO-Gruppenadressen</label>
+          </div>
           <p id="sco-export-message" class="message"></p>
-          <p class="field-hint">SCO-Telegramme werden auf markierten Gruppenadressen und auf Adressen ohne Standard-DPT dekodiert. «= Vorschau» zeigt, dass ein Telegramm Byte für Byte der aktuellen Vorschau entspricht.</p>
+          <p class="field-hint">SCO-Telegramme werden auf markierten Gruppenadressen und auf Adressen ohne Standard-DPT dekodiert. «= Vorschau» zeigt, dass ein Telegramm Byte für Byte der aktuellen Vorschau entspricht. Import: in der ETS «Telegramme speichern» (XML) oder den Gruppenmonitor als CSV exportieren – übernommen werden nur Gruppentelegramme mit genau 6 Byte, alles bleibt lokal.</p>
           <div class="monitor-table-wrap"><table class="monitor-table sco-table"><thead><tr><th>Zeit</th><th>Herkunft</th><th>Von</th><th>GA</th><th>Ziel</th><th>Befehl</th><th>Priorität</th><th>Aktion</th><th>Hex</th><th></th></tr></thead><tbody id="sco-body"><tr class="monitor-empty"><td colspan="10">Verbinden und Mitschnitt starten.</td></tr></tbody></table></div>
         </section>
         <section class="panel sco-capture">
