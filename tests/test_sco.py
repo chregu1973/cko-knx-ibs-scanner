@@ -397,3 +397,20 @@ def test_sco_suggestions_fall_back_to_names_without_size_but_skip_one_bit_dpts()
         assert [row["address"] for row in bus_connection.sco_suggestions()] == ["10/0/10"]
     finally:
         bus_connection.configure_group_addresses([])
+
+
+def test_unlinked_group_addresses_need_a_clear_sco_name() -> None:
+    """Praxisfall: 1-Bit-GAs ohne verknüpftes Objekt mit «Sektor» im Namen sind keine SCO-Vorschläge."""
+    bus_connection.configure_group_addresses([
+        {"address": "0/3/30", "name": "G17 | Fensterreinigung | Sektor 1 | ea", "dpt": None, "size": "1 Bit"},
+        {"address": "0/3/31", "name": "G17 | Fensterreinigung | Sektor 2 | ea", "dpt": None, "size": None},
+        {"address": "0/3/41", "name": "G17 | Storenreinigung | Sektor 2 | ea", "dpt": None, "size": None},
+        {"address": "3/0/0", "name": "GriesserObjekt Gebäude 23", "dpt": None, "size": None},
+        {"address": "8/0/0", "name": "GriesserObjekt Gebäude 17", "dpt": None, "size": None},
+        {"address": "21/0/253", "name": "Gebäude 1_Zentral_Griesser Objekt", "dpt": None, "size": None},
+        {"address": "9/0/1", "name": "Beschattung Süd", "dpt": None, "size": "6 Bytes"},
+    ])
+    try:
+        assert [row["address"] for row in bus_connection.sco_suggestions()] == ["3/0/0", "8/0/0", "9/0/1", "21/0/253"]
+    finally:
+        bus_connection.configure_group_addresses([])

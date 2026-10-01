@@ -3,6 +3,10 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.0.11
+
+- SCO-Vorschläge: Gruppenadressen ohne verknüpftes Kommunikationsobjekt werden nur noch bei eindeutigem Namen vorgeschlagen («Griesser», «SCO», «SunControl», «6 Byte»). «Sektor» allein reicht nicht mehr – damit erscheinen keine 1-Bit-Adressen wie «Fensterreinigung | Sektor 2» mehr.
+
 ## Version 1.0.10
 
 - Seitenleiste: scrollt in niedrigen Fenstern, statt die unteren Buttons (Feedback, Beenden, Zurück zur Toolbox) abzuschneiden; bei wenig Höhe kompakteres Logo.
