@@ -836,3 +836,19 @@ document.querySelectorAll("[data-external]").forEach((link) => link.addEventList
     window.open(link.href, "_blank", "noopener");
   }
 }));
+
+// Helles/dunkles Design umschalten; die Wahl bleibt im Programmfenster gespeichert
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const button = byId("theme-toggle");
+  const light = theme === "light";
+  button.textContent = light ? "☾ Dunkles Design" : "☀ Helles Design";
+  button.setAttribute("aria-pressed", String(light));
+  button.title = light ? "Zum dunklen Design wechseln" : "Zum hellen Design wechseln – besser lesbar bei Sonne oder Spiegelungen";
+}
+byId("theme-toggle").addEventListener("click", () => {
+  const theme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  try { localStorage.setItem("cko-ibs-theme", theme); } catch { /* ohne Speicher gilt die Wahl bis zum Schliessen */ }
+  applyTheme(theme);
+});
+applyTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");

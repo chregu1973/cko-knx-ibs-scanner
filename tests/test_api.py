@@ -193,3 +193,16 @@ def test_open_external_uses_fixed_feedback_link(monkeypatch) -> None:
     assert response.json()["opened"] is True
     assert opened[0].startswith("https://feedback.toolbox.ckoeppen.ch/?tool=KNX+IBS+Scanner&version=")
     assert client.post("/api/open-external", json={"target": "https://example.com"}).status_code == 400
+
+
+def test_light_theme_is_generated_and_linked() -> None:
+    from pathlib import Path
+
+    static = Path(__file__).resolve().parent.parent / "cko_ibs" / "static"
+    light = (static / "light.css").read_text(encoding="utf-8")
+    assert ':root[data-theme="light"]' in light
+    assert "light-overrides.css" in light  # Handkorrekturen angehängt
+    index = client.get("/").text
+    assert "/static/light.css" in index
+    assert 'id="theme-toggle"' in index
+    assert "cko-ibs-theme" in index

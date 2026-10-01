@@ -3,6 +3,11 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.0.6
+
+- Helles und dunkles Design: Umschalter «☀ Helles Design / ☾ Dunkles Design» in der Seitenleiste. Das helle Design ist bei Sonne oder Spiegelungen auf dem Bildschirm besser lesbar. Die Wahl bleibt gespeichert; ohne eigene Wahl folgt der Scanner der Windows-Einstellung.
+- Das helle Design wird mit `tools/gen_light_theme.py` aus den dunklen Stylesheets erzeugt (`light.css`), Handkorrekturen in `light-overrides.css`.
+
 ## Version 1.0.5
 
 - SCO-Objekt: fester Hinweis oben in der Maske – ohne ETS-Projekt nutzbar, zum Senden und für den Live-Mitschnitt ist aber eine bestehende KNX-Verbindung nötig; mit Button «Zur Verbindung».

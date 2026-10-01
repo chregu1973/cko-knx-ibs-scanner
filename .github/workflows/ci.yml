@@ -16,6 +16,8 @@ jobs:
       - run: pip install -e .[dev]
       - run: ruff check .
       - run: pytest -q
+      - name: Helles Design aktuell
+        run: python tools/gen_light_theme.py && git diff --exit-code cko_ibs/static/light.css
 
   windows:
     runs-on: windows-latest

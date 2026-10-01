@@ -281,3 +281,5 @@ details[open] > summary .chevron { transform: rotate(180deg); }
 .empty-line { margin: 15px; color: var(--muted); font-size: 12px; }
 @media(max-width:800px){.area-header,.line-header{grid-template-columns:auto 1fr auto}.node-summary,.line-status{display:none}.line-devices{grid-template-columns:1fr}}.feedback-button { display: block; width: 100%; margin-bottom: 10px; padding: 13px 16px; border: 1px solid #235b8c; border-radius: 9px; background: #102235; color: #9fd0ff; font-weight: 700; text-decoration: none; }
 .feedback-button:hover { border-color: var(--blue); background: #13304a; color: #fff; }
+.theme-toggle { display: block; width: 100%; margin-bottom: 10px; padding: 11px 16px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--muted); font-weight: 700; text-align: left; cursor: pointer; }
+.theme-toggle:hover { border-color: var(--blue); color: var(--text); }
