@@ -206,3 +206,52 @@ def test_light_theme_is_generated_and_linked() -> None:
     assert "/static/light.css" in index
     assert 'id="theme-toggle"' in index
     assert "cko-ibs-theme" in index
+
+
+def _tools_json(version: str):
+    import io
+    import json as _json
+
+    class Response(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self.close()
+
+    payload = [{"id": "video-suite", "version": "9.9.9"}, {"id": "knx-inspector", "version": version}]
+    return lambda request, timeout: Response(_json.dumps(payload).encode())
+
+
+def test_update_check_reports_newer_toolbox_version(monkeypatch) -> None:
+    monkeypatch.setattr("cko_ibs.main.urllib.request.urlopen", _tools_json("99.0.0"))
+    result = client.get("/api/update-check").json()
+    assert result["checked"] is True
+    assert result["update_available"] is True
+    assert result["latest"] == "99.0.0"
+    assert result["download_url"].endswith("/tools/knx-inspector/#download")
+
+
+def test_update_check_same_or_older_version_is_quiet(monkeypatch) -> None:
+    from cko_ibs import __version__
+
+    monkeypatch.setattr("cko_ibs.main.urllib.request.urlopen", _tools_json(__version__))
+    assert client.get("/api/update-check").json()["update_available"] is False
+    monkeypatch.setattr("cko_ibs.main.urllib.request.urlopen", _tools_json("0.9.0"))
+    assert client.get("/api/update-check").json()["update_available"] is False
+
+
+def test_update_check_without_internet_does_not_fail(monkeypatch) -> None:
+    def offline(request, timeout):
+        raise OSError("offline")
+
+    monkeypatch.setattr("cko_ibs.main.urllib.request.urlopen", offline)
+    result = client.get("/api/update-check").json()
+    assert result == {"checked": False, "current": result["current"], "latest": None, "update_available": False}
+
+
+def test_version_comparison_is_numeric() -> None:
+    from cko_ibs.main import _version_tuple
+
+    assert _version_tuple("1.0.10") > _version_tuple("1.0.9")
+    assert _version_tuple("0.2.0") < _version_tuple("0.10.0")

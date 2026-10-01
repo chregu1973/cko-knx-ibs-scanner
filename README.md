@@ -3,6 +3,11 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.0.9
+
+- Update-Hinweis: Beim Start fragt der Scanner einmal die öffentliche Versionsliste der CKO Toolbox ab und zeigt bei einer neueren Version «⬆ Version x.y.z verfügbar» in der Seitenleiste (Link zur Download-Seite). Es werden keine Projekt- oder Anlagendaten übertragen; ohne Internet erscheint einfach nichts. Abschaltbar über «Beim Start auf Updates prüfen».
+- Enthält die Änderungen aus 1.0.8.
+
 ## Version 1.0.8
 
 - SCO-Objekt: Vorschläge für die Gruppenadresse kommen aus der Objektgrösse im ETS-Projekt – nur GAs mit 6-Byte-Objekten erscheinen (vorher reichte z. B. «Sektor» im Namen, wodurch auch 1-Bit-Adressen auftauchten). GAs ohne verknüpftes Objekt werden weiter über den Namen erkannt.
