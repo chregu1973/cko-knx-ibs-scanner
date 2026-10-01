@@ -22,7 +22,8 @@ from cko_ibs import sco
 from cko_ibs.usb_connection import KNXUSBInterface, find_usb_device
 
 # Erkennt SCO-Objekte an ihrer Bezeichnung im ETS-Projekt (auch an der Herstellerbezeichnung)
-SCO_NAME_HINT = re.compile(r"\bsco\b|suncontrol|griesser|6[ -]?byte|sektor", re.IGNORECASE)
+# Nur eindeutige Namen; «Sektor» allein steht auch in 1-Bit-Adressen (z. B. «Fensterreinigung | Sektor 1»)
+SCO_NAME_HINT = re.compile(r"\bsco\b|suncontrol|griesser|6[ -]?byte", re.IGNORECASE)
 LOCK_NAME_HINT = re.compile(r"sperr|automatik|hand|lokal|reset|freigabe|manuell", re.IGNORECASE)
 
 
