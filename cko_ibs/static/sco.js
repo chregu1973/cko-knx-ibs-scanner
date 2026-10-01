@@ -343,3 +343,80 @@ byId("sco-view").addEventListener("click", (event) => {
 });
 setInterval(() => { if (!byId("sco-view").hidden) updateSCOBadges(); }, 1500);
 scoUpdateTargetFields();
+
+// Sperre zurücksetzen: einzelnes 1-Bit-Telegramm, z. B. Automatiksperre eines Aktors nach Handbedienung
+const LOCK_RESET_STORE = "cko-ibs-lock-reset";
+
+function lockResetValue() {
+  return document.querySelector('input[name="lock-reset-value"]:checked')?.value === "true";
+}
+
+function lockResetState() {
+  const send = byId("lock-reset-send");
+  const message = byId("lock-reset-message");
+  send.disabled = !busConnected;
+  if (!busConnected) {
+    message.className = "message warn";
+    message.textContent = "Senden gesperrt: keine KNX-Verbindung. Zuerst unter «Übersicht» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.";
+  } else if (message.classList.contains("warn")) {
+    message.className = "message";
+    message.textContent = "";
+  }
+}
+
+async function openLockReset() {
+  const dialog = byId("lock-reset-dialog");
+  try {
+    const saved = JSON.parse(localStorage.getItem(LOCK_RESET_STORE) || "{}");
+    if (saved.ga && !byId("lock-reset-ga").value) byId("lock-reset-ga").value = saved.ga;
+    if (typeof saved.value === "boolean") document.querySelector(`input[name="lock-reset-value"][value="${saved.value}"]`).checked = true;
+  } catch { /* ohne gespeicherte Werte weiter */ }
+  byId("lock-reset-message").textContent = "";
+  byId("lock-reset-message").className = "message";
+  lockResetState();
+  dialog.showModal();
+  try {
+    const {suggestions} = await scoApi("/api/sco/lock-reset/suggestions");
+    byId("lock-reset-ga-list").innerHTML = suggestions.map((row) => `<option value="${escapeHtml(row.address)}">${escapeHtml(row.name || "")}</option>`).join("");
+    byId("lock-reset-suggestions").innerHTML = suggestions.length
+      ? `<small>Aus dem ETS-Projekt:</small> ${suggestions.slice(0, 8).map((row) => `<button type="button" class="secondary compact" data-lock-ga="${escapeHtml(row.address)}">${escapeHtml(row.address)} · ${escapeHtml(row.name)}</button>`).join("")}`
+      : "";
+  } catch {
+    byId("lock-reset-suggestions").innerHTML = "";
+  }
+}
+
+async function sendLockReset() {
+  const message = byId("lock-reset-message");
+  const ga = byId("lock-reset-ga").value.trim();
+  const value = lockResetValue();
+  if (!ga) {
+    message.className = "message error";
+    message.textContent = "Bitte die Gruppenadresse des 1-Bit-Objekts eingeben.";
+    byId("lock-reset-ga").focus();
+    return;
+  }
+  const button = byId("lock-reset-send");
+  button.disabled = true;
+  try {
+    await scoApi("/api/sco/lock-reset", {method: "POST", body: JSON.stringify({group_address: ga, value, confirmed: true})});
+    try { localStorage.setItem(LOCK_RESET_STORE, JSON.stringify({ga, value})); } catch { /* optional */ }
+    message.className = "message success";
+    message.textContent = `${value ? "True (1)" : "False (0)"} an ${ga} gesendet – erscheint im Gruppenmonitor als «IBS-Test: Sperre zurücksetzen». Danach den SCO-Befehl erneut senden.`;
+  } catch (error) {
+    message.className = "message error";
+    message.textContent = `Senden fehlgeschlagen: ${error.message}`;
+  } finally {
+    lockResetState();
+  }
+}
+
+byId("lock-reset-open").addEventListener("click", openLockReset);
+byId("lock-reset-send").addEventListener("click", sendLockReset);
+byId("lock-reset-cancel").addEventListener("click", () => byId("lock-reset-dialog").close());
+byId("lock-reset-form").addEventListener("submit", (event) => { event.preventDefault(); sendLockReset(); });
+byId("lock-reset-suggestions").addEventListener("click", (event) => {
+  const pick = event.target.closest("[data-lock-ga]");
+  if (pick) byId("lock-reset-ga").value = pick.dataset.lockGa;
+});
+setInterval(() => { if (byId("lock-reset-dialog").open) lockResetState(); }, 1500);

@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>CKO KNX IBS Scanner</title>
     <link rel="icon" href="/static/cko-toolbox-logo.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=1.0.6" />
-    <link rel="stylesheet" href="/static/connection.css?v=1.0.6" />
-    <link rel="stylesheet" href="/static/branding.css?v=1.0.6" />
-    <link rel="stylesheet" href="/static/sco.css?v=1.0.6" />
-    <link rel="stylesheet" href="/static/light.css?v=1.0.6" />
+    <link rel="stylesheet" href="/static/styles.css?v=1.0.7" />
+    <link rel="stylesheet" href="/static/connection.css?v=1.0.7" />
+    <link rel="stylesheet" href="/static/branding.css?v=1.0.7" />
+    <link rel="stylesheet" href="/static/sco.css?v=1.0.7" />
+    <link rel="stylesheet" href="/static/light.css?v=1.0.7" />
     <script>
       // Design vor dem ersten Zeichnen setzen: gespeicherte Wahl, sonst Windows-Einstellung
       (function () {
@@ -33,7 +33,7 @@
         <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
         <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
       </nav>
-      <div class="sidebar-version"><span>Installierte Version</span><strong id="sidebar-version">KNX IBS Scanner 1.0.6</strong></div>
+      <div class="sidebar-version"><span>Installierte Version</span><strong id="sidebar-version">KNX IBS Scanner 1.0.7</strong></div>
       <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">☀ Helles Design</button>
       <a class="feedback-button" href="https://feedback.toolbox.ckoeppen.ch/?tool=KNX%20IBS%20Scanner" data-external="feedback" target="_blank" rel="noopener">✉ Fehler oder Idee melden</a>
       <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
@@ -204,7 +204,7 @@
             <div class="sco-suggestions" id="sco-suggestions"></div>
           </section>
           <section class="panel">
-            <div class="panel-heading"><h2>2 · Befehl</h2></div>
+            <div class="panel-heading"><h2>2 · Befehl</h2><button id="lock-reset-open" class="secondary compact" type="button" title="Automatiksperre eines Aktors über ein 1-Bit-Objekt zurücksetzen">⟲ Sperre zurücksetzen (1 Bit)</button></div>
             <div class="sco-mode" role="tablist">
               <button type="button" class="active" data-sco-mode="drive">Beschattungsposition</button>
               <button type="button" data-sco-mode="operation">Lokalbedienung</button>
@@ -269,6 +269,25 @@
         </section>
       </div>
     </main>
+    <dialog id="lock-reset-dialog" class="lock-reset-dialog">
+      <form method="dialog" id="lock-reset-form">
+        <div class="lock-reset-head"><span class="lock-reset-icon">⟲</span><div><h2>Sperre zurücksetzen</h2><p>1-Bit-Telegramm an eine Gruppenadresse senden</p></div></div>
+        <p class="lock-reset-hint">Nach einer Handbedienung setzen viele Aktoren eine <strong>Automatiksperre</strong> – SCO-Befehle werden dann ignoriert. Über das 1-Bit-Objekt des Aktors (z. B. «Automatik freigeben» oder «Handbetrieb zurücksetzen») lässt sie sich zurücksetzen. Ob <strong>True</strong> oder <strong>False</strong> die Sperre löscht, steht in der Parametrierung des Aktors.</p>
+        <label>Gruppenadresse<input id="lock-reset-ga" list="lock-reset-ga-list" placeholder="z. B. 1/2/3" autocomplete="off" spellcheck="false" /></label>
+        <datalist id="lock-reset-ga-list"></datalist>
+        <div id="lock-reset-suggestions" class="lock-reset-suggestions"></div>
+        <fieldset class="lock-reset-value">
+          <legend>Wert</legend>
+          <label><input type="radio" name="lock-reset-value" value="true" checked /> <b>True</b> <small>(1 · Ein)</small></label>
+          <label><input type="radio" name="lock-reset-value" value="false" /> <b>False</b> <small>(0 · Aus)</small></label>
+        </fieldset>
+        <p id="lock-reset-message" class="message"></p>
+        <div class="dialog-actions">
+          <button class="secondary" value="cancel" type="button" id="lock-reset-cancel">Schliessen</button>
+          <button id="lock-reset-send" class="primary" type="button">Auf den Bus senden</button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="shutdown-dialog" class="shutdown-dialog">
       <form method="dialog">
         <span class="shutdown-icon">⏻</span>
@@ -280,7 +299,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/app.js?v=1.0.6"></script>
-    <script src="/static/sco.js?v=1.0.6"></script>
+    <script src="/static/app.js?v=1.0.7"></script>
+    <script src="/static/sco.js?v=1.0.7"></script>
   </body>
 </html>
