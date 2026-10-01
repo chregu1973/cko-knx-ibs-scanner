@@ -1,0 +1,10 @@
+/* Handkorrekturen für das helle Design (werden an light.css angehängt) */
+:root[data-theme="light"]{--bg:#eef2f7;--panel:#ffffff;--panel2:#f7f9fc;--line:#d6dee9;--text:#142337;--muted:#56657a}
+:root[data-theme="light"] body{background:radial-gradient(circle at 70% -10%,#e3ebf6 0,transparent 38%),var(--bg);color:var(--text)}
+:root[data-theme="light"] .panel,:root[data-theme="light"] .stats article{background:#fff;box-shadow:0 1px 2px rgba(16,32,56,.06),0 8px 24px rgba(16,32,56,.05)}
+:root[data-theme="light"] .sidebar{background:#ffffff;border-right-color:var(--line)}
+/* Legendenpunkte: die Hilfsklassen .green/.red/.orange der Statistik-Symbole dürfen sie nicht blass machen */
+:root[data-theme="light"] .dot.green{background:var(--green)}
+:root[data-theme="light"] .dot.red{background:var(--red)}
+:root[data-theme="light"] .dot.orange{background:var(--orange)}
+:root[data-theme="light"] .dot.blue-dot{background:var(--blue)}
