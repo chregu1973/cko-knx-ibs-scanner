@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Any
 
 from xknx import XKNX
-from xknx.dpt import DPTArray
+from xknx.dpt import DPTArray, DPTBinary
 from xknx.exceptions import XKNXException
 from xknx.io import ConnectionConfig, ConnectionType, SecureConfig
 from xknx.management.procedures import nm_individual_address_check
@@ -23,6 +23,7 @@ from cko_ibs.usb_connection import KNXUSBInterface, find_usb_device
 
 # Erkennt SCO-Objekte an ihrer Bezeichnung im ETS-Projekt (auch an der Herstellerbezeichnung)
 SCO_NAME_HINT = re.compile(r"\bsco\b|suncontrol|griesser|6[ -]?byte|sektor", re.IGNORECASE)
+LOCK_NAME_HINT = re.compile(r"sperr|automatik|hand|lokal|reset|freigabe|manuell", re.IGNORECASE)
 SCO_LOG_SIZE = 5000
 
 DEVICE_OBJECT_PROPERTIES = {
@@ -468,6 +469,35 @@ class BusConnection:
         self.sco_log.append({key: item.get(key) for key in (
             "time", "direction", "source", "destination", "group_name", "service", "secure")} | {
             "hex": decoded["hex"], "decoded": decoded, "origin": item.get("origin", "bus")})
+
+    def lock_reset_suggestions(self) -> list[dict[str, str | None]]:
+        """1-Bit-GAs aus dem ETS-Projekt, deren Name auf eine Sperre oder Automatik/Handbetrieb hindeutet."""
+        return [row for address, row in sorted(self._group_addresses.items())
+                if LOCK_NAME_HINT.search(str(row.get("name") or ""))
+                and (not row.get("dpt") or str(row.get("dpt")).startswith("1."))]
+
+    async def send_bit(self, group_address: str, value: bool, label: str = "") -> dict[str, Any]:
+        """Einzelnes 1-Bit-Telegramm (GroupValueWrite) senden, z. B. um eine Automatiksperre zurückzusetzen."""
+        if not self.connected or self.xknx is None:
+            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst unter «Übersicht» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.")
+        destination = GroupAddress(group_address)
+        payload = apci.GroupValueWrite(DPTBinary(1 if value else 0))
+        await self.xknx.telegrams.put(Telegram(destination_address=destination, payload=payload))
+        item = {
+            "time": datetime.now().astimezone().isoformat(timespec="milliseconds"),
+            "direction": "Outgoing",
+            "source": str(self.xknx.current_address),
+            "destination": str(destination),
+            "group_name": self._group_addresses.get(str(destination), {}).get("name"),
+            "dpt": "1.x",
+            "service": "GroupValueWrite",
+            "value": "1 · True" if value else "0 · False",
+            "raw": str(payload),
+            "secure": False,
+            "origin": f"IBS-Test{': ' + label if label else ''}",
+        }
+        self._publish(item)
+        return item
 
     async def send_sco(self, group_address: str, frames: list[bytes], label: str = "") -> list[dict[str, Any]]:
         """6-Byte-Telegramme nacheinander als GroupValueWrite senden und protokollieren."""

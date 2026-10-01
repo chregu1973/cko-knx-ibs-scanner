@@ -3,6 +3,10 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.0.7
+
+- SCO-Objekt: Button «⟲ Sperre zurücksetzen (1 Bit)» bei den Befehlen. Ein Dialog sendet True oder False an eine frei wählbare Gruppenadresse – z. B. um die Automatiksperre eines Aktors nach Handbedienung zurückzusetzen, damit SCO-Befehle wieder ankommen. Vorschläge aus dem ETS-Projekt (1-Bit-Adressen mit «Sperre», «Automatik», «Hand» … im Namen), letzte Adresse und Wert werden gemerkt; das Telegramm erscheint im Gruppenmonitor als «IBS-Test: Sperre zurücksetzen».
+
 ## Version 1.0.6
 
 - Helles und dunkles Design: Umschalter «☀ Helles Design / ☾ Dunkles Design» in der Seitenleiste. Das helle Design ist bei Sonne oder Spiegelungen auf dem Bildschirm besser lesbar. Die Wahl bleibt gespeichert; ohne eigene Wahl folgt der Scanner der Windows-Einstellung.

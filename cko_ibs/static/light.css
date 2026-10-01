@@ -192,6 +192,11 @@
 :root[data-theme="light"] .sco-requirement.ok strong{color:#1aa765}
 :root[data-theme="light"] .sco-send-hint.warn{color:#c26700}
 :root[data-theme="light"] .sco-send-hint.ok{color:#1aa765}
+:root[data-theme="light"] .lock-reset-dialog{box-shadow:0 24px 80px rgba(15, 31, 51, 0.233)}
+:root[data-theme="light"] .lock-reset-dialog::backdrop{background:rgba(50, 79, 129, 0.36)}
+:root[data-theme="light"] .lock-reset-icon{background:#e3ecf5}
+:root[data-theme="light"] .lock-reset-dialog input#lock-reset-ga{background:#eef2f8}
+:root[data-theme="light"] .message.warn{color:#c26700}
 /* light-overrides.css */
 /* Handkorrekturen für das helle Design (werden an light.css angehängt) */
 :root[data-theme="light"]{--bg:#eef2f7;--panel:#ffffff;--panel2:#f7f9fc;--line:#d6dee9;--text:#142337;--muted:#56657a}

@@ -18,6 +18,8 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, Web
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from xknx.exceptions import CouldNotParseAddress
+from xknx.telegram.address import GroupAddress
 
 from cko_ibs import __version__, sco, sco_import
 from cko_ibs.bus_connection import bus_connection
@@ -369,6 +371,37 @@ async def sco_send(request: SCOSendRequest) -> dict:
         sent = await bus_connection.send_sco(request.group_address, frames, request.label)
     except (sco.SCOError, ValueError) as exc:
         raise _sco_error(exc) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Senden fehlgeschlagen: {exc}") from exc
+    return {"sent": sent}
+
+
+class BitWriteRequest(BaseModel):
+    group_address: str
+    value: bool
+    confirmed: bool = False
+    label: str = "Sperre zurücksetzen"
+
+
+@app.get("/api/sco/lock-reset/suggestions")
+async def lock_reset_suggestions() -> dict:
+    return {"suggestions": bus_connection.lock_reset_suggestions()}
+
+
+@app.post("/api/sco/lock-reset")
+async def lock_reset(request: BitWriteRequest) -> dict:
+    """1-Bit-Telegramm senden, z. B. um die Automatiksperre eines Aktors nach Handbedienung zurückzusetzen."""
+    if not request.confirmed:
+        raise HTTPException(status_code=428, detail="Senden muss im Dialog bestätigt werden.")
+    address = request.group_address.strip()
+    try:
+        address = str(GroupAddress(address))
+    except CouldNotParseAddress as exc:
+        raise HTTPException(status_code=400, detail=f"Ungültige Gruppenadresse «{address}» – Format z. B. 1/2/3.") from exc
+    try:
+        sent = await bus_connection.send_bit(address, request.value, request.label[:60])
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except Exception as exc:
