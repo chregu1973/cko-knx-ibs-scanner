@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import urllib.request
 import webbrowser
 from collections.abc import Callable
 from pathlib import Path
@@ -610,7 +611,44 @@ def external_links() -> dict[str, str]:
     return {
         "feedback": f"https://feedback.toolbox.ckoeppen.ch/?{feedback}",
         "toolbox": "https://toolbox.ckoeppen.ch/",
+        "download": DOWNLOAD_PAGE,
     }
+
+
+# --- Update-Prüfung -------------------------------------------------------------
+# Fragt nur die öffentliche Versionsliste der CKO Toolbox ab; es werden keine Projekt- oder Anlagendaten übertragen.
+
+TOOLS_JSON_URL = "https://toolbox.ckoeppen.ch/data/tools.json"
+DOWNLOAD_PAGE = "https://toolbox.ckoeppen.ch/tools/knx-inspector/#download"
+TOOL_ID = "knx-inspector"
+
+
+def _version_tuple(value: str) -> tuple[int, ...]:
+    parts = []
+    for part in str(value).split("."):
+        digits = "".join(ch for ch in part if ch.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+def _fetch_latest_version(timeout: float = 4.0) -> str | None:
+    request = urllib.request.Request(TOOLS_JSON_URL, headers={"User-Agent": f"CKO-KNX-IBS-Scanner/{__version__}"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:  # feste HTTPS-Adresse der Toolbox
+        tools = json.loads(response.read(512 * 1024).decode("utf-8"))
+    entry = next((tool for tool in tools if isinstance(tool, dict) and tool.get("id") == TOOL_ID), None)
+    return str(entry["version"]) if entry and entry.get("version") else None
+
+
+@app.get("/api/update-check")
+def update_check() -> dict:
+    """Vergleicht die installierte Version mit der auf der Toolbox veröffentlichten."""
+    try:
+        latest = _fetch_latest_version()
+    except (OSError, ValueError, KeyError, TypeError):
+        return {"checked": False, "current": __version__, "latest": None, "update_available": False}
+    available = bool(latest) and _version_tuple(latest) > _version_tuple(__version__)
+    return {"checked": latest is not None, "current": __version__, "latest": latest,
+            "update_available": available, "download_url": DOWNLOAD_PAGE}
 
 
 @app.post("/api/open-external")

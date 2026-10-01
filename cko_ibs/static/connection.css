@@ -283,3 +283,9 @@ details[open] > summary .chevron { transform: rotate(180deg); }
 .feedback-button:hover { border-color: var(--blue); background: #13304a; color: #fff; }
 .theme-toggle { display: block; width: 100%; margin-bottom: 10px; padding: 11px 16px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--muted); font-weight: 700; text-align: left; cursor: pointer; }
 .theme-toggle:hover { border-color: var(--blue); color: var(--text); }
+.update-banner { display: grid; gap: 2px; margin: auto 0 10px; padding: 11px 14px; border: 1px solid #256d50; border-radius: 9px; background: #10261e; color: #70e5ae; font-weight: 700; text-decoration: none; }
+.update-banner[hidden] { display: none; }
+.update-banner small { color: var(--muted); font-weight: 500; }
+.update-banner:hover { border-color: var(--green); color: #fff; }
+.update-toggle { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--muted); font-size: 11px; cursor: pointer; }
+.update-banner:not([hidden]) + .sidebar-version { margin-top: 0; }

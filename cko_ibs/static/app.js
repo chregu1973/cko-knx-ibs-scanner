@@ -856,3 +856,28 @@ byId("theme-toggle").addEventListener("click", () => {
   applyTheme(theme);
 });
 applyTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
+
+// Update-Prüfung beim Start (abschaltbar); fragt nur die öffentliche Versionsliste der Toolbox ab
+const UPDATE_CHECK_STORE = "cko-ibs-update-check";
+function updateCheckEnabled() {
+  try { return localStorage.getItem(UPDATE_CHECK_STORE) !== "off"; } catch { return true; }
+}
+async function checkForUpdate() {
+  byId("update-banner").hidden = true;
+  if (!updateCheckEnabled()) return;
+  try {
+    const response = await fetch("/api/update-check");
+    const result = await response.json();
+    if (result.update_available) {
+      byId("update-banner-text").textContent = `Version ${result.latest} verfügbar`;
+      byId("update-banner").title = `Installiert: ${result.current} · Neu: ${result.latest} – Setup über die bestehende Installation ausführen, Einstellungen bleiben erhalten.`;
+      byId("update-banner").hidden = false;
+    }
+  } catch { /* ohne Internet keine Meldung */ }
+}
+byId("update-check-toggle").checked = updateCheckEnabled();
+byId("update-check-toggle").addEventListener("change", (event) => {
+  try { localStorage.setItem(UPDATE_CHECK_STORE, event.target.checked ? "on" : "off"); } catch { /* gilt bis zum Schliessen */ }
+  checkForUpdate();
+});
+checkForUpdate();

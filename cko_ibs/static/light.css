@@ -161,6 +161,8 @@
 :root[data-theme="light"] .feedback-button{border:1px solid #82b6e3;background:#e3ecf5;color:#214b72}
 :root[data-theme="light"] .feedback-button:hover{background:#dae6f1;color:#1f1f1f}
 :root[data-theme="light"] .theme-toggle{background:transparent}
+:root[data-theme="light"] .update-banner{border:1px solid #c5e9da;background:#eaf6f2;color:#1aa765}
+:root[data-theme="light"] .update-banner:hover{color:#1f1f1f}
 /* branding.css */
 :root[data-theme="light"] .sidebar{background:radial-gradient(circle at 22% 10%, #d0dded 0, transparent 28%),
     linear-gradient(180deg, #f3f6fb 0%, #eef3f9 58%, #f1f4fa 100%);border-right-color:#cddbec;box-shadow:12px 0 40px rgba(15, 31, 51, 0.21)}
