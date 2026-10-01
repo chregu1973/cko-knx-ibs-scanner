@@ -289,3 +289,12 @@ details[open] > summary .chevron { transform: rotate(180deg); }
 .update-banner:hover { border-color: var(--green); color: #fff; }
 .update-toggle { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--muted); font-size: 11px; cursor: pointer; }
 .update-banner:not([hidden]) + .sidebar-version { margin-top: 0; }
+/* Seitenleiste scrollt in niedrigen Fenstern, statt die unteren Buttons abzuschneiden */
+.sidebar { overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+@media (max-height: 820px) {
+  .sidebar { padding-top: 16px; }
+  .sidebar .brand { flex-direction: row; align-items: center; padding-bottom: 16px; }
+  .sidebar .brand-mark { width: 56px; height: auto; }
+  .sidebar .nav-item { padding-top: 10px; padding-bottom: 10px; }
+  .sidebar-version { padding-top: 8px; padding-bottom: 8px; }
+}
