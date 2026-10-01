@@ -171,6 +171,30 @@ def _build_topology(
     return areas
 
 
+def _object_size(group_address: dict[str, Any], communication_objects: dict[str, Any]) -> str | None:
+    """Objektgrösse der mit der GA verknüpften Kommunikationsobjekte («1 Bit», «6 Bytes» …), falls im Projekt hinterlegt."""
+    sizes = []
+    for object_id in group_address.get("communication_object_ids") or []:
+        size = str((communication_objects.get(object_id) or {}).get("object_size") or "").strip()
+        if size and size not in sizes:
+            sizes.append(size)
+    return sizes[0] if len(sizes) == 1 else (" / ".join(sizes) if sizes else None)
+
+
+def group_address_rows(group_addresses: dict[str, Any], communication_objects: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = []
+    for address, group_address in group_addresses.items():
+        rows.append(
+            {
+                "address": str(group_address.get("address") or address),
+                "name": _name(group_address, "Unbenannte Gruppenadresse"),
+                "dpt": _format_dpt(group_address.get("dpt")),
+                "size": _object_size(group_address, communication_objects),
+            }
+        )
+    return rows
+
+
 def read_project(path: Path, password: str | None = None) -> dict[str, Any]:
     """Parse an ETS project without changing it and return a compact UI model."""
     project = XKNXProj(str(path), password=password or None).parse()
@@ -195,15 +219,7 @@ def read_project(path: Path, password: str | None = None) -> dict[str, Any]:
             }
         )
 
-    group_address_rows = []
-    for address, group_address in group_addresses.items():
-        group_address_rows.append(
-            {
-                "address": str(group_address.get("address") or address),
-                "name": _name(group_address, "Unbenannte Gruppenadresse"),
-                "dpt": _format_dpt(group_address.get("dpt")),
-            }
-        )
+    rows = group_address_rows(group_addresses, project.get("communication_objects", {}) or {})
 
     return {
         "name": _name(info, path.stem),
@@ -216,5 +232,5 @@ def read_project(path: Path, password: str | None = None) -> dict[str, Any]:
         "topology": _build_topology(
             topology, devices, segments, policies, line_media
         ),
-        "group_addresses": group_address_rows,
+        "group_addresses": rows,
     }

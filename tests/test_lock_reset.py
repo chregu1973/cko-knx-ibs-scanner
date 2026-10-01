@@ -68,9 +68,11 @@ def test_lock_reset_suggestions_use_project_names() -> None:
         {"address": "1/2/4", "name": "Raffstore Büro Handbetrieb", "dpt": None},
         {"address": "1/2/5", "name": "Automatik Sollwert", "dpt": "9.001"},
         {"address": "1/2/6", "name": "Licht Büro", "dpt": "1.001"},
+        {"address": "1/2/7", "name": "Storen Automatik SCO", "dpt": None, "size": "6 Bytes"},
+        {"address": "1/2/8", "name": "Fensterreinigung Freigabe", "dpt": None, "size": "1 Bit"},
     ])
     try:
         addresses = [row["address"] for row in client.get("/api/sco/lock-reset/suggestions").json()["suggestions"]]
-        assert addresses == ["1/2/3", "1/2/4"]
+        assert addresses == ["1/2/3", "1/2/4", "1/2/8"]
     finally:
         bus_connection.configure_group_addresses([])

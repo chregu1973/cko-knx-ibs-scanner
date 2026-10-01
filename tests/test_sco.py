@@ -355,3 +355,45 @@ def test_send_without_connection_explains_that_no_project_is_needed() -> None:
     assert response.status_code == 409
     assert "KNX-Verbindung" in response.json()["detail"]
     assert "ETS-Projekt ist nicht nötig" in response.json()["detail"]
+
+
+def test_group_address_rows_take_object_size_from_communication_objects() -> None:
+    from cko_ibs.project_reader import group_address_rows
+
+    rows = group_address_rows(
+        {"0/3/30": {"address": "0/3/30", "name": "G17 | Fensterreinigung | Sektor 1 | ea", "dpt": {"main": 1, "sub": 1},
+                    "communication_object_ids": ["O-1"]},
+         "10/0/10": {"address": "10/0/10", "name": "Beschattungszentrale", "dpt": None,
+                     "communication_object_ids": ["O-2", "O-3"]},
+         "1/1/1": {"address": "1/1/1", "name": "ohne Verknüpfung", "dpt": None, "communication_object_ids": []}},
+        {"O-1": {"object_size": "1 Bit"}, "O-2": {"object_size": "6 Bytes"}, "O-3": {"object_size": "6 Bytes"}},
+    )
+    sizes = {row["address"]: row["size"] for row in rows}
+    assert sizes == {"0/3/30": "1 Bit", "10/0/10": "6 Bytes", "1/1/1": None}
+
+
+def test_sco_suggestions_only_list_six_byte_objects_when_sizes_are_known() -> None:
+    bus_connection.configure_group_addresses([
+        {"address": "0/3/30", "name": "G17 | Fensterreinigung | Sektor 1 | ea", "dpt": "1.001", "size": "1 Bit"},
+        {"address": "0/3/2", "name": "G17 | Storen Zentrale", "dpt": None, "size": "6 Bytes"},
+        {"address": "0/3/10", "name": "G17 | SCO Sektor 1", "dpt": None, "size": "6 Bytes"},
+        {"address": "0/3/40", "name": "G17 | Storenreinigung | Sektor 1 | ea", "dpt": None, "size": "1 Bit"},
+        {"address": "10/0/10", "name": "Griesser Zentrale SCO", "dpt": None, "size": None},
+    ])
+    try:
+        assert [row["address"] for row in bus_connection.sco_suggestions()] == ["0/3/2", "0/3/10", "10/0/10"]
+        assert bus_connection._sco_candidate("0/3/10") and not bus_connection._sco_candidate("0/3/30")
+        assert [row["address"] for row in bus_connection.lock_reset_suggestions()] == []
+    finally:
+        bus_connection.configure_group_addresses([])
+
+
+def test_sco_suggestions_fall_back_to_names_without_size_but_skip_one_bit_dpts() -> None:
+    bus_connection.configure_group_addresses([
+        {"address": "0/3/30", "name": "Fensterreinigung Sektor 1", "dpt": "1.001"},
+        {"address": "10/0/10", "name": "Griesser SCO", "dpt": None},
+    ])
+    try:
+        assert [row["address"] for row in bus_connection.sco_suggestions()] == ["10/0/10"]
+    finally:
+        bus_connection.configure_group_addresses([])

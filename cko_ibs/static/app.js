@@ -413,7 +413,11 @@ byId("project-form").addEventListener("submit", async (event) => {
     byId("device-count").textContent = project.device_count;
     document.querySelector(".stats article:nth-child(2) strong").textContent = "0";
     document.querySelector(".stats article:nth-child(3) strong").textContent = "0";
-    byId("open-count").textContent = project.devices.filter((device) => device.kind !== "dummy").length;
+    const testable = project.devices.filter((device) => device.kind !== "dummy").length;
+    const placeholders = project.device_count - testable;
+    byId("open-count").textContent = testable;
+    byId("device-count-label").textContent = placeholders ? `Geräte · davon ${placeholders} Platzhalter` : "Geräte";
+    byId("device-count-card").title = placeholders ? `${placeholders} Platzhalter-/Dummy-Geräte im Projekt werden nicht am Bus geprüft.` : "";
     message.textContent = `${project.device_count} Geräte und ${project.group_address_count} Gruppenadressen eingelesen.`;
     const topology = byId("topology");
     renderTopology(project.topology, project.devices);
@@ -655,10 +659,10 @@ function updateTopologySummaries() {
     const warnings = cards.filter((card) => card.classList.contains("warning")).length;
     const infos = cards.filter((card) => card.classList.contains("info-device")).length;
     const open = cards.length - ok - errors - warnings - infos;
-    line.querySelector('[data-scope="line"]').textContent = `${cards.length} Geräte · ${ok} OK · ${errors} Fehler · ${warnings} Warnung · ${open} offen${infos ? ` · ${infos} Info` : ""}`;
+    line.querySelector('[data-scope="line"]').textContent = `${cards.length} Geräte · ${ok} OK · ${errors} Fehler · ${warnings} Warnung · ${open} ungeprüft${infos ? ` · ${infos} Info` : ""}`;
     const status = line.querySelector(".line-status");
     status.className = `line-status ${errors ? "error" : warnings ? "warning" : open ? "unchecked" : "ok"}`;
-    status.textContent = errors ? "Fehler" : warnings ? "Warnung" : open ? "offen" : "OK";
+    status.textContent = errors ? "Fehler" : warnings ? "Warnung" : open ? "ungeprüft" : "OK";
     const mapNode = document.querySelector(`[data-line-address="${CSS.escape(line.dataset.lineAddress || "")}"]:not(.topology-line)`);
     if (mapNode) {
       mapNode.classList.remove("has-error", "has-warning", "has-open", "is-ok");
@@ -676,7 +680,7 @@ function updateTopologySummaries() {
     const warnings = cards.filter((card) => card.classList.contains("warning")).length;
     const infos = cards.filter((card) => card.classList.contains("info-device")).length;
     const open = cards.length - ok - errors - warnings - infos;
-    area.querySelector('[data-scope="area"]').textContent = `${cards.length} Geräte · ${ok} OK · ${errors} Fehler · ${warnings} Warnung · ${open} offen${infos ? ` · ${infos} Info` : ""}`;
+    area.querySelector('[data-scope="area"]').textContent = `${cards.length} Geräte · ${ok} OK · ${errors} Fehler · ${warnings} Warnung · ${open} ungeprüft${infos ? ` · ${infos} Info` : ""}`;
   });
   drawTopologyFlows();
   renderOpenPoints();

@@ -3,6 +3,12 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.0.8
+
+- SCO-Objekt: Vorschläge für die Gruppenadresse kommen aus der Objektgrösse im ETS-Projekt – nur GAs mit 6-Byte-Objekten erscheinen (vorher reichte z. B. «Sektor» im Namen, wodurch auch 1-Bit-Adressen auftauchten). GAs ohne verknüpftes Objekt werden weiter über den Namen erkannt.
+- «Sperre zurücksetzen» schlägt nur 1-Bit-Adressen vor; die Live-Dekodierung nutzt die Objektgrösse ebenfalls.
+- Übersicht: «offen» heisst jetzt «ungeprüft» (noch nicht am Bus geprüft) – mit Hinweis, wie viele Platzhalter-/Dummy-Geräte nicht geprüft werden.
+
 ## Version 1.0.7
 
 - SCO-Objekt: Button «⟲ Sperre zurücksetzen (1 Bit)» bei den Befehlen. Ein Dialog sendet True oder False an eine frei wählbare Gruppenadresse – z. B. um die Automatiksperre eines Aktors nach Handbedienung zurückzusetzen, damit SCO-Befehle wieder ankommen. Vorschläge aus dem ETS-Projekt (1-Bit-Adressen mit «Sperre», «Automatik», «Hand» … im Namen), letzte Adresse und Wert werden gemerkt; das Telegramm erscheint im Gruppenmonitor als «IBS-Test: Sperre zurücksetzen».

@@ -24,6 +24,21 @@ from cko_ibs.usb_connection import KNXUSBInterface, find_usb_device
 # Erkennt SCO-Objekte an ihrer Bezeichnung im ETS-Projekt (auch an der Herstellerbezeichnung)
 SCO_NAME_HINT = re.compile(r"\bsco\b|suncontrol|griesser|6[ -]?byte|sektor", re.IGNORECASE)
 LOCK_NAME_HINT = re.compile(r"sperr|automatik|hand|lokal|reset|freigabe|manuell", re.IGNORECASE)
+
+
+def _is_six_bytes(size: object) -> bool:
+    return bool(re.fullmatch(r"\s*6\s*bytes?\s*", str(size or ""), re.IGNORECASE))
+
+
+def _is_one_bit(size: object) -> bool:
+    return bool(re.fullmatch(r"\s*1\s*bits?\s*", str(size or ""), re.IGNORECASE))
+
+
+def _ga_sort_key(address: str) -> tuple[int, ...]:
+    try:
+        return tuple(int(part) for part in str(address).split("/"))
+    except ValueError:
+        return (1 << 30,)
 SCO_LOG_SIZE = 5000
 
 DEVICE_OBJECT_PROPERTIES = {
@@ -421,9 +436,12 @@ class BusConnection:
     # --- SCO-Objekt ---------------------------------------------------------
 
     def sco_suggestions(self) -> list[dict[str, str | None]]:
-        """GAs aus dem ETS-Projekt, deren Bezeichnung auf ein SCO-Objekt hindeutet."""
-        return [row for address, row in sorted(self._group_addresses.items())
-                if SCO_NAME_HINT.search(str(row.get("name") or ""))]
+        """GAs aus dem ETS-Projekt mit 6-Byte-Objekten (SCO); GAs ohne verknüpftes Objekt über den Namen."""
+        rows = [row for _address, row in sorted(self._group_addresses.items(), key=lambda item: _ga_sort_key(item[0]))]
+        # Bekannte Objektgrösse entscheidet; ohne verknüpftes Objekt (z. B. Zentrale nicht im Projekt) zählt der Name
+        return [row for row in rows if _is_six_bytes(row.get("size")) or (
+            not row.get("size") and SCO_NAME_HINT.search(str(row.get("name") or ""))
+            and not str(row.get("dpt") or "").startswith("1."))]
 
     def group_names(self) -> dict[str, str | None]:
         """GA-Bezeichnungen aus dem geladenen ETS-Projekt (für importierte Aufzeichnungen)."""
@@ -441,10 +459,13 @@ class BusConnection:
         return self.sco_addresses
 
     def _sco_candidate(self, destination: str) -> bool:
-        # Markierte GAs immer; sonst nur GAs ohne bekannten Standard-DPT, damit nichts falsch gedeutet wird
+        # Markierte GAs immer; sonst 6-Byte-Objekte laut Projekt bzw. GAs ohne bekannten Standard-DPT
         if destination in self._sco_addresses:
             return True
-        return not self._group_addresses.get(destination, {}).get("dpt")
+        row = self._group_addresses.get(destination, {})
+        if row.get("size"):
+            return _is_six_bytes(row.get("size"))
+        return not row.get("dpt")
 
     def _publish(self, item: dict[str, Any]) -> None:
         for queue in tuple(self._subscribers):
@@ -472,9 +493,10 @@ class BusConnection:
 
     def lock_reset_suggestions(self) -> list[dict[str, str | None]]:
         """1-Bit-GAs aus dem ETS-Projekt, deren Name auf eine Sperre oder Automatik/Handbetrieb hindeutet."""
-        return [row for address, row in sorted(self._group_addresses.items())
-                if LOCK_NAME_HINT.search(str(row.get("name") or ""))
-                and (not row.get("dpt") or str(row.get("dpt")).startswith("1."))]
+        rows = [row for _address, row in sorted(self._group_addresses.items(), key=lambda item: _ga_sort_key(item[0]))]
+        return [row for row in rows if LOCK_NAME_HINT.search(str(row.get("name") or ""))
+                and (_is_one_bit(row.get("size")) if row.get("size")
+                     else (not row.get("dpt") or str(row.get("dpt")).startswith("1.")))]
 
     async def send_bit(self, group_address: str, value: bool, label: str = "") -> dict[str, Any]:
         """Einzelnes 1-Bit-Telegramm (GroupValueWrite) senden, z. B. um eine Automatiksperre zurückzusetzen."""

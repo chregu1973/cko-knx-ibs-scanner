@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>CKO KNX IBS Scanner</title>
     <link rel="icon" href="/static/cko-toolbox-logo.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=1.0.7" />
-    <link rel="stylesheet" href="/static/connection.css?v=1.0.7" />
-    <link rel="stylesheet" href="/static/branding.css?v=1.0.7" />
-    <link rel="stylesheet" href="/static/sco.css?v=1.0.7" />
-    <link rel="stylesheet" href="/static/light.css?v=1.0.7" />
+    <link rel="stylesheet" href="/static/styles.css?v=1.0.8" />
+    <link rel="stylesheet" href="/static/connection.css?v=1.0.8" />
+    <link rel="stylesheet" href="/static/branding.css?v=1.0.8" />
+    <link rel="stylesheet" href="/static/sco.css?v=1.0.8" />
+    <link rel="stylesheet" href="/static/light.css?v=1.0.8" />
     <script>
       // Design vor dem ersten Zeichnen setzen: gespeicherte Wahl, sonst Windows-Einstellung
       (function () {
@@ -33,7 +33,7 @@
         <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
         <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
       </nav>
-      <div class="sidebar-version"><span>Installierte Version</span><strong id="sidebar-version">KNX IBS Scanner 1.0.7</strong></div>
+      <div class="sidebar-version"><span>Installierte Version</span><strong id="sidebar-version">KNX IBS Scanner 1.0.8</strong></div>
       <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">☀ Helles Design</button>
       <a class="feedback-button" href="https://feedback.toolbox.ckoeppen.ch/?tool=KNX%20IBS%20Scanner" data-external="feedback" target="_blank" rel="noopener">✉ Fehler oder Idee melden</a>
       <button id="shutdown-button" class="shutdown-button" type="button">⏻ Anwendung beenden</button>
@@ -48,10 +48,10 @@
       </header>
 
       <section class="stats">
-        <article><span class="stat-icon blue">▣</span><div><strong id="device-count">0</strong><p>Geräte</p></div></article>
+        <article id="device-count-card"><span class="stat-icon blue">▣</span><div><strong id="device-count">0</strong><p id="device-count-label">Geräte</p></div></article>
         <article><span class="stat-icon green">✓</span><div><strong>0</strong><p>OK</p></div></article>
         <article><span class="stat-icon red">×</span><div><strong>0</strong><p>Fehler</p></div></article>
-        <article><span class="stat-icon orange">!</span><div><strong id="open-count">0</strong><p>offen</p></div></article>
+        <article title="Geräte, die noch nicht am Bus geprüft wurden – «Geräte prüfen» bei der Topologie startet die Prüfung. Platzhalter-/Dummy-Geräte werden nicht geprüft."><span class="stat-icon orange">?</span><div><strong id="open-count">0</strong><p>ungeprüft</p></div></article>
       </section>
 
       <section class="workspace-grid">
@@ -299,7 +299,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/app.js?v=1.0.7"></script>
-    <script src="/static/sco.js?v=1.0.7"></script>
+    <script src="/static/app.js?v=1.0.8"></script>
+    <script src="/static/sco.js?v=1.0.8"></script>
   </body>
 </html>
