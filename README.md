@@ -3,6 +3,10 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.0.10
+
+- Seitenleiste: scrollt in niedrigen Fenstern, statt die unteren Buttons (Feedback, Beenden, Zurück zur Toolbox) abzuschneiden; bei wenig Höhe kompakteres Logo.
+
 ## Version 1.0.9
 
 - Update-Hinweis: Beim Start fragt der Scanner einmal die öffentliche Versionsliste der CKO Toolbox ab und zeigt bei einer neueren Version «⬆ Version x.y.z verfügbar» in der Seitenleiste (Link zur Download-Seite). Es werden keine Projekt- oder Anlagendaten übertragen; ohne Internet erscheint einfach nichts. Abschaltbar über «Beim Start auf Updates prüfen».
