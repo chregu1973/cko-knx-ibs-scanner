@@ -14,6 +14,7 @@ Gruppenmonitor zum Beobachten, Bedienen und Testen – mit oder ohne ETS-Projekt
 - **Busaktivität:** Telegramme pro Sekunde, geschätzte Buslast, aktivster Sender, Live-Ticker.
 - **Funktionstest mit Rückmeldung:** Befehls- und Status-Adressen werden aus dem Projekt zugeordnet; Befehl senden, auf den passenden Statuswert warten (bei Bedarf nachlesen), Ergebnis mit Antwortzeit, Prüfprotokoll als HTML und CSV.
 - **Aufnahme & Wiedergabe:** Busverkehr mit Zeitstempeln aufnehmen, speichern, laden, animiert abspielen (1–10×) und auf Wunsch die Schreib-Telegramme erneut auf den Bus senden.
+- **KNX Data Secure für jede Verbindungsart** (KNX/IP UDP/TCP, TCP Secure, USB): ETS-Schlüsselbund (.knxkeys) in der Übersicht laden – verschlüsselte Gruppenadressen werden lesbar, mit 🔒 markiert und lassen sich schalten. Ohne Schlüssel erscheinen Secure-Telegramme als «🔒 Schlüssel fehlt» statt zu verschwinden. Der Scanner zeigt, ob die aktuelle Quelladresse als Data-Secure-Sender eingetragen ist, und schlägt passende Tunneladressen aus dem Schlüsselbund vor. Schlüssel bleiben nur im Arbeitsspeicher.
 - Telegrammliste als CSV speichern; Windows-Build mit selbst übersetztem PyInstaller-Bootloader (weniger Fehlalarme von Virenscannern).
 
 ## Version 1.0.11

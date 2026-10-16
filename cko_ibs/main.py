@@ -186,6 +186,37 @@ async def connect_secure(
         ) from exc
 
 
+@app.post("/api/knx/data-secure")
+async def load_data_secure(
+    keyring: Annotated[UploadFile, File()],
+    password: Annotated[str | None, Form()] = None,
+) -> dict:
+    """ETS-Schlüsselbund (.knxkeys) für KNX Data Secure laden – für jede Verbindungsart, nur im Arbeitsspeicher."""
+    filename = Path(keyring.filename or "project.knxkeys").name
+    if not filename.lower().endswith(".knxkeys"):
+        raise HTTPException(status_code=400, detail="Bitte eine .knxkeys-Datei auswählen (ETS › Projekt › Sicherheit exportieren).")
+    payload = await keyring.read()
+    if len(payload) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Die Keyring-Datei ist größer als 20 MB.")
+    with tempfile.TemporaryDirectory(prefix="cko-knx-secure-") as tmp_dir:
+        path = Path(tmp_dir) / filename
+        path.write_bytes(payload)
+        try:
+            return await bus_connection.load_data_secure(str(path), password, filename)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/api/knx/data-secure")
+async def clear_data_secure() -> dict:
+    return bus_connection.clear_data_secure()
+
+
+@app.get("/api/knx/data-secure")
+async def data_secure_status() -> dict:
+    return bus_connection.data_secure_status()
+
+
 @app.get("/api/knx/status")
 async def connection_status() -> dict:
     return bus_connection.status()
@@ -357,7 +388,8 @@ def _monitor_error(exc: Exception) -> HTTPException:
 async def monitor_groups() -> dict:
     return {"groups": bus_connection.group_rows(), "ranges": bus_connection.range_names,
             "state": bus_connection.group_state, "pairs": bus_connection.status_pairs(),
-            "send_mode": bus_connection.send_mode()}
+            "send_mode": bus_connection.send_mode(), "data_secure": bus_connection.data_secure_status(),
+            "secure_groups": sorted(bus_connection.secure_groups())}
 
 
 @app.put("/api/monitor/dpt")

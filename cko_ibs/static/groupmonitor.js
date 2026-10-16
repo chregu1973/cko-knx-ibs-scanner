@@ -31,6 +31,7 @@
     sendMode: {enabled: false, remaining_s: 0}, tab: "tiles", total: 0,
     stamps: [], rate: Array(60).fill(0), sources: new Map(), renderTimer: null,
     recording: null, recordings: [], player: null, tests: [], testStop: false, testRunning: false,
+    secure: new Set(), undecoded: 0,
   };
 
   // --- Hilfen --------------------------------------------------------------------------
@@ -87,6 +88,7 @@
   }
 
   function valueText(group, value = group.value) {
+    if ((value === null || value === undefined) && group.locked) return "🔒 Schlüssel fehlt";
     if (value === null || value === undefined) return group.hex ? `Roh ${group.hex}` : "–";
     const sub = dptSub(group.dpt);
     if (typeof value === "boolean") {
@@ -139,6 +141,14 @@
       if (gm.recording) gm.recording.telegrams.push({...item, t: now - gm.recording.started});
     }
     const group = ensureGroup(item.destination, {name: item.group_name, dpt: item.dpt, unit: item.unit});
+    if (item.secure) { group.secure = true; gm.secure.add(group.address); }
+    if (item.undecoded) {
+      group.locked = true;
+      gm.undecoded += 1;
+      showSecureHint();
+    } else if (item.secure) {
+      group.locked = false;
+    }
     group.count += 1;
     group.last = item.time || new Date().toISOString();
     group.source = item.direction === "Outgoing" ? "IBS Scanner" : item.source;
@@ -161,14 +171,21 @@
     gm.devices = new Map((event.detail?.devices || []).map((device) => [device.address, device.name]));
     loadGroups();
   });
-  window.addEventListener("knx-connection", () => refreshSendMode());
+  window.addEventListener("knx-connection", (event) => {
+    refreshSendMode();
+    if (event.detail?.status?.data_secure) applyDataSecure(event.detail.status.data_secure);
+    else refreshDataSecure();
+  });
 
   async function loadGroups() {
     try {
       const data = await api("/api/monitor/groups");
       gm.ranges = data.ranges || {};
       gm.pairs = data.pairs || [];
-      (data.groups || []).forEach((row) => ensureGroup(row.address, row));
+      gm.secure = new Set(data.secure_groups || []);
+      (data.groups || []).forEach((row) => { const group = ensureGroup(row.address, row); group.secure = Boolean(row.secure) || gm.secure.has(row.address); });
+      gm.secure.forEach((address) => { if (gm.groups.has(address)) gm.groups.get(address).secure = true; });
+      applyDataSecure(data.data_secure);
       Object.entries(data.state || {}).forEach(([address, state]) => {
         const group = ensureGroup(address, {dpt: state.dpt, unit: state.unit});
         group.value = state.value_json ?? group.value;
@@ -229,13 +246,13 @@
 
   function tileState(group) {
     const on = group.value === true || (typeof group.value === "number" && group.value > 0 && ["level", "dim"].includes(group.kind));
-    return `gm-tile kind-${group.kind}${on ? " on" : ""}${group.status ? " is-status" : ""}${group.count ? " seen" : ""}`;
+    return `gm-tile kind-${group.kind}${on ? " on" : ""}${group.status ? " is-status" : ""}${group.count ? " seen" : ""}${group.locked ? " locked" : ""}`;
   }
 
   function tileHtml(group) {
     return `<button class="${tileState(group)}" type="button" data-ga="${esc(group.address)}" title="${esc(group.address)} · ${esc(group.name || "ohne Namen")}${group.dpt ? ` · DPT ${esc(group.dpt)}` : ""}">
       <span class="gm-visual">${visual(group)}</span>
-      <span class="gm-tile-text"><strong>${esc(group.name || group.address)}</strong><small>${esc(group.address)}${group.dpt ? ` · ${esc(group.dpt)}` : " · DPT ?"}${group.status ? " · Status" : ""}</small></span>
+      <span class="gm-tile-text"><strong>${esc(group.name || group.address)}</strong><small>${group.secure ? "🔒 " : ""}${esc(group.address)}${group.dpt ? ` · ${esc(group.dpt)}` : " · DPT ?"}${group.status ? " · Status" : ""}</small></span>
       <span class="gm-value">${esc(valueText(group))}</span>
       <span class="gm-meta" data-since="${esc(group.last || "")}">${group.count ? `${since(group.last)} · ${esc(group.source || "")} · ${group.count}×` : "noch kein Telegramm"}</span>
     </button>`;
@@ -468,7 +485,7 @@
       : "<span>Noch keine Werte empfangen.</span>";
     $("gm-control-visual").className = `gm-control-visual ${tileState(group)}`;
     $("gm-control-visual").innerHTML = `<span class="gm-visual">${visual(group)}</span>`;
-    $("gm-control-meta").textContent = `${group.dpt ? `DPT ${group.dpt}` : "Datentyp unbekannt"} · aktuell ${valueText(group)}${group.count ? ` · ${group.count} Telegramme` : ""}`;
+    $("gm-control-meta").textContent = `${group.secure ? "🔒 Data Secure · " : ""}${group.dpt ? `DPT ${group.dpt}` : "Datentyp unbekannt"} · aktuell ${valueText(group)}${group.count ? ` · ${group.count} Telegramme` : ""}${group.locked ? " · Schlüsselbund in der Übersicht laden" : ""}`;
   }
 
   function openControl(address) {
@@ -497,8 +514,9 @@
     try {
       if (!(await ensureSendMode())) return;
       const sent = await send(dialog.dataset.ga, payload);
-      message.className = "message success";
-      message.textContent = payload.service === "read" ? "Lese-Anfrage gesendet – Antwort erscheint in der Kachel." : `Gesendet: ${sent.value ?? sent.hex}`;
+      message.className = sent.secure_warning ? "message error" : "message success";
+      message.textContent = payload.service === "read" ? "Lese-Anfrage gesendet – Antwort erscheint in der Kachel."
+        : `Gesendet${sent.secure ? " (Data Secure, verschlüsselt)" : ""}: ${sent.value ?? sent.hex}${sent.secure_warning ? ` – ⚠ ${sent.secure_warning}` : ""}`;
     } catch (error) {
       message.className = "message error";
       message.textContent = error.message;
@@ -1113,6 +1131,83 @@
     button.textContent = "⚡ Auf den Bus senden";
   });
 
+  // --- KNX Data Secure (Übersicht › Verbindung) -----------------------------------------------
+  function showSecureHint() {
+    if (gm.secureHintShown || gm.dataSecure?.active) return;
+    gm.secureHintShown = true;
+    const hint = $("gm-tile-hint");
+    hint.insertAdjacentHTML("afterend", '<div class="gm-secure-hint">🔒 Verschlüsselte Telegramme (KNX Data Secure) empfangen, aber kein passender Schlüssel geladen. In der <b>Übersicht</b> unter «KNX Data Secure» die .knxkeys-Datei aus der ETS laden – dann erscheinen die Werte lesbar.</div>');
+  }
+
+  function applyDataSecure(status) {
+    if (!status) return;
+    gm.dataSecure = status;
+    const badge = $("ds-badge");
+    const box = $("ds-status");
+    badge.className = `ds-badge${status.loaded ? (status.active || !busConnected ? " loaded" : " warn") : ""}`;
+    badge.textContent = status.loaded ? `${status.group_address_count} Adressen${status.active ? " · aktiv" : busConnected ? " · nicht aktiv" : " · bereit"}` : "nicht geladen";
+    $("ds-clear").hidden = !status.loaded;
+    if (!status.loaded) { box.hidden = true; return; }
+    box.hidden = false;
+    const current = status.current_interface;
+    box.innerHTML = `<span><b>${esc(status.filename || "Schlüsselbund")}</b> · ${status.group_address_count} Data-Secure-Gruppenadressen${status.undecoded ? ` · ${status.undecoded} Telegramme ohne Schlüssel` : ""}</span>
+      <span>${status.active ? "✓ Entschlüsselung aktiv auf der laufenden Verbindung." : "Wird beim Verbinden automatisch verwendet."}
+      ${busConnected && status.current_address ? (status.can_send ? ` Senden mit ${esc(status.current_address)} möglich.` : ` ⚠ Quelladresse ${esc(status.current_address)} ist nicht als Data-Secure-Sender eingetragen – Lesen geht, Senden wird ignoriert.`) : ""}</span>
+      ${status.interfaces.length ? `<span>Tunneladressen aus dem Schlüsselbund (Klick übernimmt sie als Tunneladresse):</span><div class="ds-interfaces">${status.interfaces.map((item) => `<button type="button" data-ds-ia="${esc(item.individual_address)}" class="${current && current.individual_address === item.individual_address ? "current" : ""}">${esc(item.individual_address)} · ${esc(item.type)}${item.user_id ? ` · Benutzer ${item.user_id}` : ""} · ${item.secure_group_count} Secure-GA</button>`).join("")}</div>` : ""}`;
+    gm.secure = new Set([...gm.secure]);
+  }
+
+  async function refreshDataSecure() {
+    try { applyDataSecure(await api("/api/knx/data-secure")); } catch { /* Anzeige bleibt */ }
+  }
+
+  $("ds-file").addEventListener("change", (event) => {
+    $("ds-file-label").textContent = event.target.files[0]?.name || ".knxkeys auswählen";
+  });
+  $("ds-load").addEventListener("click", async () => {
+    const file = $("ds-file").files[0];
+    const message = $("ds-message");
+    if (!file) { message.className = "message error"; message.textContent = "Bitte zuerst die .knxkeys-Datei auswählen."; return; }
+    const form = new FormData();
+    form.append("keyring", file);
+    form.append("password", $("ds-password").value);
+    $("ds-load").disabled = true;
+    message.className = "message";
+    message.textContent = "Schlüsselbund wird lokal geöffnet …";
+    try {
+      const response = await fetch("/api/knx/data-secure", {method: "POST", body: form});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Schlüsselbund konnte nicht geladen werden");
+      message.className = "message success";
+      message.textContent = data.group_address_count ? `${data.group_address_count} Data-Secure-Gruppenadressen geladen.` : "Geladen – der Schlüsselbund enthält aber keine Data-Secure-Gruppenadressen.";
+      $("ds-password").value = "";
+      applyDataSecure(data);
+      loadGroups();
+    } catch (error) {
+      message.className = "message error";
+      message.textContent = error.message;
+    } finally {
+      $("ds-load").disabled = false;
+    }
+  });
+  $("ds-clear").addEventListener("click", async () => {
+    try {
+      applyDataSecure(await api("/api/knx/data-secure", {method: "DELETE"}));
+      $("ds-message").className = "message";
+      $("ds-message").textContent = "Schlüsselbund entfernt.";
+      gm.secure = new Set();
+      gm.groups.forEach((group) => { group.secure = false; });
+      renderTiles();
+    } catch (error) { $("ds-message").textContent = error.message; }
+  });
+  $("ds-status").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-ds-ia]");
+    if (!button) return;
+    $("individual-address").value = button.dataset.dsIa;
+    $("ds-message").className = "message success";
+    $("ds-message").textContent = `Tunneladresse ${button.dataset.dsIa} übernommen – mit «Verbinden» (TCP) neu verbinden.`;
+  });
+
   // --- Auswahllisten --------------------------------------------------------------------------
   function fillDatalists() {
     $("gm-ga-list").innerHTML = [...gm.groups.values()].slice(0, 3000).map((group) => `<option value="${esc(group.address)}">${esc(group.name || "")}</option>`).join("");
@@ -1122,5 +1217,6 @@
   fillDatalists();
   loadGroups();
   refreshSendMode();
+  refreshDataSecure();
   renderTests();
 })();

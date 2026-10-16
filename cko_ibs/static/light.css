@@ -163,6 +163,14 @@
 :root[data-theme="light"] .theme-toggle{background:transparent}
 :root[data-theme="light"] .update-banner{border:1px solid #c5e9da;background:#eaf6f2;color:#1aa765}
 :root[data-theme="light"] .update-banner:hover{color:#1f1f1f}
+:root[data-theme="light"] .ds-badge{border:1px solid #9fafc4;color:#505d70}
+:root[data-theme="light"] .ds-badge.loaded{border-color:#c5e9da;color:#1aa765;background:#eaf6f2}
+:root[data-theme="light"] .ds-badge.warn{border-color:#ebddc9;color:#c27500;background:#f7f1e9}
+:root[data-theme="light"] .ds-status{border:1px solid #d9e0ea;background:#f0f5f9;color:#34465a}
+:root[data-theme="light"] .ds-status b{color:#1f1f1f}
+:root[data-theme="light"] .ds-interfaces button{border:1px solid #91b1d4;background:#e9f0f7;color:#0065c2}
+:root[data-theme="light"] .ds-interfaces button.current{border-color:#83e2b8;color:#1aa765}
+:root[data-theme="light"] .ds-hint{color:#505d70}
 /* branding.css */
 :root[data-theme="light"] .sidebar{background:radial-gradient(circle at 22% 10%, #d0dded 0, transparent 28%),
     linear-gradient(180deg, #f3f6fb 0%, #eef3f9 58%, #f1f4fa 100%);border-right-color:#cddbec;box-shadow:12px 0 40px rgba(15, 31, 51, 0.21)}
@@ -329,6 +337,8 @@
 :root[data-theme="light"] .gm-play-log time{color:#505d70}
 :root[data-theme="light"] .gm-play-log em{color:#0065c2}
 :root[data-theme="light"] .gm-play-log small{color:#5d6979}
+:root[data-theme="light"] .gm-secure-hint{border:1px solid #88c7dd;background:#eaf2f7;color:#277087}
+:root[data-theme="light"] .gm-tile.locked .gm-value{color:#277087}
 /* light-overrides.css */
 /* Handkorrekturen für das helle Design (werden an light.css angehängt) */
 :root[data-theme="light"]{--bg:#eef2f7;--panel:#ffffff;--panel2:#f7f9fc;--line:#d6dee9;--text:#142337;--muted:#56657a}

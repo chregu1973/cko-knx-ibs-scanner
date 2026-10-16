@@ -9,6 +9,7 @@ import time
 from collections import deque
 from contextlib import suppress
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from xknx import XKNX
@@ -16,6 +17,7 @@ from xknx.dpt import DPTArray, DPTBinary
 from xknx.exceptions import XKNXException
 from xknx.io import ConnectionConfig, ConnectionType, SecureConfig
 from xknx.management.procedures import nm_individual_address_check
+from xknx.secure.keyring import InterfaceType, Keyring, load_keyring
 from xknx.telegram import Telegram, apci
 from xknx.telegram.address import GroupAddress, IndividualAddress
 
@@ -90,6 +92,10 @@ class BusConnection:
         self._range_names: dict[str, str] = {}
         self.group_state: dict[str, dict[str, Any]] = {}  # letzter Wert je Gruppenadresse
         self._send_enabled_until = 0.0
+        # KNX Data Secure: Schlüsselbund (.knxkeys) nur im Arbeitsspeicher, gilt für jede Verbindungsart
+        self.data_secure_keyring: Keyring | None = None
+        self.data_secure_info: dict[str, Any] | None = None
+        self.undecoded_secure = 0
 
     @property
     def connected(self) -> bool:
@@ -120,6 +126,7 @@ class BusConnection:
                     route_back=route_back,
                     auto_reconnect=True,
                     individual_address=requested_address,
+                    secure_config=SecureConfig(keyring=self.data_secure_keyring) if self.data_secure_keyring else None,
                 )
                 candidate = XKNX(connection_config=config, telegram_received_cb=self._on_telegram)
                 try:
@@ -137,6 +144,7 @@ class BusConnection:
                 self.connection_mode = label
                 self.requested_individual_address = requested_address
                 self._apply_group_address_dpts()
+                self._activate_data_secure()
                 return self.status(
                     f"KNX/IP-Tunnel über {label} dauerhaft aufgebaut. Busmonitor ist aktiv."
                 )
@@ -171,6 +179,7 @@ class BusConnection:
             self.requested_individual_address = requested_address
             self.usb_device = device.to_dict()
             self._apply_group_address_dpts()
+            self._activate_data_secure()
         return self.status("Siemens OCI702 USB verbunden. Busmonitor ist aktiv.")
 
     async def disconnect(self) -> dict[str, Any]:
@@ -195,18 +204,15 @@ class BusConnection:
         local = str(ipaddress.ip_address(local_ip)) if local_ip else None
         requested_address = self._validate_individual_address(individual_address)
         if keyring_path:
-            if not keyring_password:
-                raise ValueError("Für die .knxkeys-Datei ist ein Passwort erforderlich.")
-            secure = SecureConfig(
-                knxkeys_file_path=keyring_path,
-                knxkeys_password=keyring_password,
-                user_id=user_id,
-            )
+            keyring = await self._read_keyring(keyring_path, keyring_password)
+            self._set_keyring(keyring, Path(keyring_path).name)
+            secure = SecureConfig(keyring=keyring, user_id=user_id)
         elif user_id is not None and user_password:
             secure = SecureConfig(
                 user_id=user_id,
                 user_password=user_password,
                 device_authentication_password=device_authentication_password or None,
+                keyring=self.data_secure_keyring,  # Data Secure aus separat geladenem Schlüsselbund
             )
         else:
             raise ValueError(
@@ -238,6 +244,7 @@ class BusConnection:
             self.local_ip = local
             self.connection_mode = "TCP Secure"
             self.requested_individual_address = requested_address
+            self._activate_data_secure()
             self._apply_group_address_dpts()
         return self.status(
             "Gesicherter KNX/IP-Tunnel über TCP aufgebaut. Busmonitor ist aktiv."
@@ -420,6 +427,7 @@ class BusConnection:
             "requested_individual_address": self.requested_individual_address,
             "usb_device": self.usb_device,
             "address_warning": address_warning,
+            "data_secure": self.data_secure_status(),
             "message": message,
         }
 
@@ -560,6 +568,107 @@ class BusConnection:
                 await asyncio.sleep(0.25)  # Reihenfolge Fahrbefehl → Sperre auf dem Bus sicherstellen
         return sent
 
+    # --- KNX Data Secure ------------------------------------------------------------
+
+    @staticmethod
+    async def _read_keyring(path: str, password: str | None) -> Keyring:
+        if not password:
+            raise ValueError("Für die .knxkeys-Datei ist ein Passwort erforderlich.")
+        try:
+            return await load_keyring(path, password)
+        except Exception as exc:
+            raise ValueError("Schlüsselbund konnte nicht geöffnet werden – Passwort der .knxkeys-Datei prüfen.") from exc
+
+    def _set_keyring(self, keyring: Keyring, filename: str) -> None:
+        keys = keyring.get_data_secure_group_keys()
+        interfaces = []
+        for interface in keyring.interfaces:
+            if interface.individual_address is None:
+                continue
+            secure_groups = [ga for ga in interface.group_addresses if ga in keys]
+            interfaces.append({
+                "individual_address": str(interface.individual_address),
+                "type": {InterfaceType.TUNNELING: "Tunnel", InterfaceType.USB: "USB",
+                         InterfaceType.BACKBONE: "Backbone"}.get(interface.type, str(interface.type)),
+                "user_id": interface.user_id,
+                "host": str(interface.host) if interface.host else None,
+                "secure_group_count": len(secure_groups),
+            })
+        self.data_secure_keyring = keyring
+        self.data_secure_info = {
+            "filename": filename,
+            "group_addresses": sorted((str(ga) for ga in keys), key=_ga_sort_key),
+            "group_address_count": len(keys),
+            "sender_count": len(keyring.get_data_secure_senders()),
+            "interfaces": sorted(interfaces, key=lambda item: -item["secure_group_count"])[:24],
+        }
+
+    async def load_data_secure(self, path: str, password: str | None, filename: str) -> dict[str, Any]:
+        """Schlüsselbund für KNX Data Secure laden; wirkt sofort auf eine bestehende Verbindung."""
+        keyring = await self._read_keyring(path, password)
+        self._set_keyring(keyring, filename)
+        self._activate_data_secure()
+        return self.data_secure_status()
+
+    def clear_data_secure(self) -> dict[str, Any]:
+        self.data_secure_keyring = None
+        self.data_secure_info = None
+        if self.xknx is not None:
+            self.xknx.cemi_handler.data_secure_init(keyring=None)
+        return self.data_secure_status()
+
+    def _activate_data_secure(self) -> None:
+        """Data Secure in der laufenden xknx-Instanz einschalten und unlesbare Secure-Telegramme melden."""
+        if self.xknx is None:
+            return
+        if self.data_secure_keyring is not None:
+            self.xknx.cemi_handler.data_secure_init(keyring=self.data_secure_keyring)
+        with suppress(AttributeError):
+            self.xknx.telegram_queue.register_data_secure_group_key_issue_cb(self._on_secure_key_issue)
+
+    def data_secure_status(self) -> dict[str, Any]:
+        info = self.data_secure_info or {}
+        current = str(self.xknx.current_address) if self.xknx is not None else None
+        interface = next((item for item in info.get("interfaces", []) if item["individual_address"] == current), None)
+        active = bool(self.xknx is not None and getattr(self.xknx.cemi_handler, "data_secure", None) is not None)
+        return {
+            "loaded": self.data_secure_keyring is not None,
+            "active": active,
+            "filename": info.get("filename"),
+            "group_address_count": info.get("group_address_count", 0),
+            "interfaces": info.get("interfaces", []),
+            "current_address": current,
+            "current_interface": interface,
+            "can_send": bool(interface and interface["secure_group_count"]),
+            "undecoded": self.undecoded_secure,
+        }
+
+    def secure_groups(self) -> set[str]:
+        return set((self.data_secure_info or {}).get("group_addresses", []))
+
+    def _on_secure_key_issue(self, telegram: Telegram) -> None:
+        """Verschlüsseltes Gruppentelegramm ohne passenden Schlüssel – trotzdem im Monitor zeigen."""
+        self.undecoded_secure += 1
+        destination = str(telegram.destination_address)
+        row = self._group_addresses.get(destination, {})
+        self._publish({
+            "time": datetime.now().astimezone().isoformat(timespec="milliseconds"),
+            "direction": telegram.direction.value,
+            "source": str(telegram.source_address),
+            "destination": destination,
+            "group_name": row.get("name"),
+            "dpt": row.get("dpt"),
+            "service": "DataSecure",
+            "value": "🔒 verschlüsselt – Schlüssel fehlt",
+            "value_json": None,
+            "unit": None,
+            "hex": "",
+            "small": False,
+            "raw": "",
+            "secure": True,
+            "undecoded": True,
+        })
+
     # --- Gruppenmonitor: Werte, Senden, Funktionstest -------------------------------
 
     def _remember(self, item: dict[str, Any]) -> None:
@@ -569,7 +678,9 @@ class BusConnection:
 
     def group_rows(self) -> list[dict[str, Any]]:
         rows = [row for _address, row in sorted(self._group_addresses.items(), key=lambda item: _ga_sort_key(item[0]))]
-        return [dict(row) | {"info": group_monitor.describe(row.get("dpt"))} for row in rows]
+        secure = self.secure_groups()
+        return [dict(row) | {"info": group_monitor.describe(row.get("dpt")), "secure": str(row.get("address")) in secure}
+                for row in rows]
 
     @property
     def range_names(self) -> dict[str, str]:
@@ -637,9 +748,37 @@ class BusConnection:
         item = self._outgoing_item(destination, "GroupValueWrite", label, dpt,
                                    decoded if decoded is not None else shown, group_monitor.payload_hex(payload_value))
         item["small"] = isinstance(payload_value, DPTBinary)
+        item["secure"] = destination in self.secure_groups()
+        if item["secure"]:
+            item["secure_warning"] = self._secure_send_warning(destination)
         self._remember(item)
         self._publish(item)
         return item
+
+    def _secure_send_warning(self, destination: str) -> str | None:
+        """Data-Secure-Geräte nehmen nur Telegramme von Absendern an, die in der ETS eingetragen sind."""
+        status = self.data_secure_status()
+        interface = status["current_interface"]
+        keyring = self.data_secure_keyring
+        if keyring is None:
+            return None
+        ia = self.xknx.current_address if self.xknx is not None else None
+        allowed = ia is not None and any(
+            ia in senders for ga, senders in self._keyring_group_senders(keyring).items() if str(ga) == destination)
+        if allowed or (interface and interface["secure_group_count"]):
+            return None
+        return (f"Gesendet mit Quelladresse {status['current_address']}. Data-Secure-Geräte übernehmen den Wert nur, wenn diese "
+                "Adresse in der ETS als Sender eingetragen ist – sonst eine Tunneladresse aus dem Schlüsselbund verwenden.")
+
+    @staticmethod
+    def _keyring_group_senders(keyring: Keyring) -> dict[Any, list[Any]]:
+        senders: dict[Any, list[Any]] = {}
+        for interface in keyring.interfaces:
+            for ga, ias in interface.group_addresses.items():
+                senders.setdefault(ga, []).extend(ias)
+                if interface.individual_address is not None:
+                    senders[ga].append(interface.individual_address)
+        return senders
 
     async def send_read(self, group_address: str, label: str = "") -> dict[str, Any]:
         """GroupValueRead senden; die Antwort erscheint als GroupValueResponse im Monitor."""

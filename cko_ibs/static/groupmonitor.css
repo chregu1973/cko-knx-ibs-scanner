@@ -214,3 +214,5 @@ dialog.gm-control{width:min(620px,calc(100vw - 30px))}
 [data-gm-pane][hidden],.gm-net-empty[hidden],.gm-net-tip[hidden],.gm-replay-banner[hidden],.gm-player[hidden],.gm-control-lock[hidden]{display:none!important}
 .gm-header .header-actions{flex-wrap:nowrap;align-items:center}
 .gm-header .header-actions>*{white-space:nowrap}
+.gm-secure-hint{margin:0 0 10px;padding:10px 13px;border-radius:9px;border:1px solid #286b83;background:#0c1f29;color:#8ddcf4;font-size:13px}
+.gm-tile.locked .gm-value{color:#8ddcf4;font-size:13px}

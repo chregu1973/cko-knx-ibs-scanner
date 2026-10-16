@@ -112,6 +112,22 @@
               <label>Authentifizierungscode (optional)<input id="secure-auth-code" type="password" autocomplete="off" /></label>
             </div></details>
           </div>
+          <details id="data-secure-controls" class="secure-controls data-secure-controls">
+            <summary class="secure-heading"><span>🔒</span><div><strong>KNX Data Secure <em id="ds-badge" class="ds-badge">nicht geladen</em></strong><small>Verschlüsselte Gruppenadressen lesen und schalten – für jede Verbindungsart (KNX/IP, Secure, USB). Schlüssel bleiben nur im Arbeitsspeicher.</small></div></summary>
+            <div class="secure-grid">
+              <label class="secure-file">ETS-Schlüsselbund (.knxkeys)
+                <span id="ds-file-label">.knxkeys auswählen</span>
+                <input id="ds-file" type="file" accept=".knxkeys" />
+              </label>
+              <label>Passwort der .knxkeys
+                <input id="ds-password" type="password" autocomplete="off" placeholder="beim Export in der ETS vergeben" />
+              </label>
+            </div>
+            <div class="ds-actions"><button id="ds-load" class="secondary" type="button">Schlüsselbund laden</button><button id="ds-clear" class="secondary" type="button" hidden>Entfernen</button></div>
+            <p id="ds-message" class="message"></p>
+            <div id="ds-status" class="ds-status" hidden></div>
+            <p class="ds-hint">Export in der ETS: Projekt › Sicherheit › Schlüsselbund exportieren. Lesen funktioniert mit jeder Quelladresse; <b>Senden</b> an Data-Secure-Adressen nur mit einer Tunneladresse, die in der ETS als Sender eingetragen ist (siehe Liste nach dem Laden).</p>
+          </details>
           <p id="connection-message" class="message"></p>
           <div id="gateway-list" class="empty-state"><span>⌁</span><strong>Noch keine Suche durchgeführt</strong><small>KNX/IP wird im Netzwerk gesucht; USB-Schnittstellen werden lokal erkannt.</small></div>
         </article>

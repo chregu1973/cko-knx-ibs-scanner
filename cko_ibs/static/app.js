@@ -217,7 +217,7 @@ byId("test-connection-button").addEventListener("click", async () => {
     byId("device-scan-button").disabled = projectDevices.length === 0;
     busConnected = true;
     updateMonitorConnectionBadge();
-    window.dispatchEvent(new CustomEvent("knx-connection", {detail: {connected: true}}));
+    window.dispatchEvent(new CustomEvent("knx-connection", {detail: {connected: true, status: data}}));
     byId("disconnect-button").hidden = false;
     startMonitor();
   } catch (error) {

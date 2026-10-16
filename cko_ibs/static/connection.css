@@ -298,3 +298,19 @@ details[open] > summary .chevron { transform: rotate(180deg); }
   .sidebar .nav-item { padding-top: 10px; padding-bottom: 10px; }
   .sidebar-version { padding-top: 8px; padding-bottom: 8px; }
 }
+
+/* KNX Data Secure */
+.data-secure-controls{display:block}
+.data-secure-controls>summary{cursor:pointer;list-style:none;margin-bottom:0}
+.data-secure-controls>summary::-webkit-details-marker{display:none}
+.data-secure-controls[open]>summary{margin-bottom:12px}
+.ds-badge{margin-left:8px;padding:2px 7px;border-radius:10px;border:1px solid #3b4b60;color:#8f9caf;font-size:10px;font-style:normal;font-weight:700}
+.ds-badge.loaded{border-color:#256d50;color:#70e5ae;background:#10261e}
+.ds-badge.warn{border-color:#6b4b1c;color:#ffc46b;background:#2a1d0c}
+.ds-actions{display:flex;gap:8px;margin-top:10px}
+.ds-status{margin-top:8px;padding:10px 12px;border:1px solid #263346;border-radius:8px;background:#09121c;font-size:12px;color:#c6d1de;display:grid;gap:6px}
+.ds-status b{color:#fff}
+.ds-interfaces{display:flex;flex-wrap:wrap;gap:6px}
+.ds-interfaces button{border:1px solid #315276;background:#0c1a2a;color:#7fc2ff;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer}
+.ds-interfaces button.current{border-color:#37cc8a;color:#70e5ae}
+.ds-hint{margin:10px 0 0;color:#8f9caf;font-size:11px;line-height:1.5}
