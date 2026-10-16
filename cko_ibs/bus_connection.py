@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import re
+import time
 from collections import deque
 from contextlib import suppress
 from datetime import datetime
@@ -18,7 +19,7 @@ from xknx.management.procedures import nm_individual_address_check
 from xknx.telegram import Telegram, apci
 from xknx.telegram.address import GroupAddress, IndividualAddress
 
-from cko_ibs import sco
+from cko_ibs import group_monitor, sco
 from cko_ibs.usb_connection import KNXUSBInterface, find_usb_device
 
 # Erkennt SCO-Objekte an ihrer Bezeichnung im ETS-Projekt (auch an der Herstellerbezeichnung)
@@ -86,6 +87,9 @@ class BusConnection:
         self._sco_addresses: set[str] = set()
         self.sco_log: deque[dict[str, Any]] = deque(maxlen=SCO_LOG_SIZE)
         self._lock = asyncio.Lock()
+        self._range_names: dict[str, str] = {}
+        self.group_state: dict[str, dict[str, Any]] = {}  # letzter Wert je Gruppenadresse
+        self._send_enabled_until = 0.0
 
     @property
     def connected(self) -> bool:
@@ -419,9 +423,11 @@ class BusConnection:
             "message": message,
         }
 
-    def configure_group_addresses(self, rows: list[dict[str, str | None]]) -> None:
+    def configure_group_addresses(self, rows: list[dict[str, str | None]],
+                                  range_names: dict[str, str] | None = None) -> None:
         """Keep ETS group address metadata in local memory for monitor enrichment."""
         self._group_addresses = {str(row["address"]): row for row in rows}
+        self._range_names = dict(range_names or {})
         self._apply_group_address_dpts()
 
     def _apply_group_address_dpts(self) -> None:
@@ -554,6 +560,162 @@ class BusConnection:
                 await asyncio.sleep(0.25)  # Reihenfolge Fahrbefehl → Sperre auf dem Bus sicherstellen
         return sent
 
+    # --- Gruppenmonitor: Werte, Senden, Funktionstest -------------------------------
+
+    def _remember(self, item: dict[str, Any]) -> None:
+        if item.get("service") in {"GroupValueWrite", "GroupValueResponse"}:
+            self.group_state[item["destination"]] = {key: item.get(key) for key in (
+                "time", "source", "service", "value", "value_json", "unit", "hex", "dpt", "direction")}
+
+    def group_rows(self) -> list[dict[str, Any]]:
+        rows = [row for _address, row in sorted(self._group_addresses.items(), key=lambda item: _ga_sort_key(item[0]))]
+        return [dict(row) | {"info": group_monitor.describe(row.get("dpt"))} for row in rows]
+
+    @property
+    def range_names(self) -> dict[str, str]:
+        return dict(self._range_names)
+
+    def status_pairs(self) -> list[dict[str, Any]]:
+        return group_monitor.status_pairs(list(self._group_addresses.values()), self._range_names)
+
+    def set_dpt(self, group_address: str, dpt: str | None) -> dict[str, Any]:
+        """Datentyp für eine GA festlegen (z. B. ohne ETS-Projekt); gilt ab dem nächsten Telegramm."""
+        address = group_monitor.parse_group_address(group_address)
+        if dpt and group_monitor.transcoder_for(dpt) is None:
+            raise group_monitor.MonitorError(f"Unbekannter Datentyp «{dpt}».")
+        row = dict(self._group_addresses.get(address) or {"address": address, "name": None, "size": None})
+        row["dpt"] = dpt or None
+        self._group_addresses[address] = row
+        self._apply_group_address_dpts()
+        return row
+
+    def send_mode(self) -> dict[str, Any]:
+        remaining = max(0, round(self._send_enabled_until - time.monotonic()))
+        return {"enabled": remaining > 0, "remaining_s": remaining}
+
+    def set_send_mode(self, enabled: bool) -> dict[str, Any]:
+        self._send_enabled_until = time.monotonic() + group_monitor.SEND_MODE_SECONDS if enabled else 0.0
+        return self.send_mode()
+
+    def _require_sending(self) -> None:
+        if not self.connected or self.xknx is None:
+            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst unter «Übersicht» mit der KNX-Schnittstelle verbinden.")
+        if not self.send_mode()["enabled"]:
+            raise PermissionError("Senden ist gesperrt. Oben «Nur beobachten» anklicken und Senden für 30 Minuten freigeben.")
+
+    def _outgoing_item(self, destination: str, service: str, label: str, dpt: Any = None,
+                       value: Any = None, hex_value: str = "") -> dict[str, Any]:
+        row = self._group_addresses.get(destination, {})
+        dpt = dpt or row.get("dpt")
+        return {
+            "time": datetime.now().astimezone().isoformat(timespec="milliseconds"),
+            "direction": "Outgoing",
+            "source": str(self.xknx.current_address) if self.xknx is not None else "",
+            "destination": destination,
+            "group_name": row.get("name"),
+            "dpt": dpt,
+            "service": service,
+            "value": None if value is None else str(value),
+            "value_json": group_monitor.json_value(value),
+            "unit": group_monitor.describe(dpt).get("unit"),
+            "hex": hex_value,
+            "raw": "",
+            "secure": False,
+            "origin": f"IBS-Monitor{': ' + label if label else ''}",
+        }
+
+    async def send_value(self, group_address: str, dpt: Any = None, value: Any = None, raw_hex: str | None = None,
+                         raw_small: bool = False, label: str = "") -> dict[str, Any]:
+        """GroupValueWrite mit beliebigem Datentyp senden (oder als Rohwert)."""
+        self._require_sending()
+        destination = group_monitor.parse_group_address(group_address)
+        dpt = dpt or self._group_addresses.get(destination, {}).get("dpt")
+        payload_value, shown = group_monitor.encode(dpt, value, raw_hex, raw_small)
+        decoded = group_monitor.decode(dpt, payload_value) if not raw_hex else None
+        await self.xknx.telegrams.put(Telegram(destination_address=GroupAddress(destination),
+                                               payload=apci.GroupValueWrite(payload_value)))
+        item = self._outgoing_item(destination, "GroupValueWrite", label, dpt,
+                                   decoded if decoded is not None else shown, group_monitor.payload_hex(payload_value))
+        item["small"] = isinstance(payload_value, DPTBinary)
+        self._remember(item)
+        self._publish(item)
+        return item
+
+    async def send_read(self, group_address: str, label: str = "") -> dict[str, Any]:
+        """GroupValueRead senden; die Antwort erscheint als GroupValueResponse im Monitor."""
+        self._require_sending()
+        destination = group_monitor.parse_group_address(group_address)
+        await self.xknx.telegrams.put(Telegram(destination_address=GroupAddress(destination),
+                                               payload=apci.GroupValueRead()))
+        item = self._outgoing_item(destination, "GroupValueRead", label)
+        self._publish(item)
+        return item
+
+    async def function_test(self, command: str, value: Any, status: str | None = None, dpt: Any = None,
+                            timeout: float = 3.0, read_fallback: bool = True) -> dict[str, Any]:
+        """Befehl senden und auf die Rückmeldung der Status-GA warten (bei Bedarf einmal nachlesen)."""
+        command = group_monitor.parse_group_address(command)
+        status = group_monitor.parse_group_address(status) if status else command
+        timeout = min(max(float(timeout), 0.5), 15.0)
+        queue = self.subscribe()
+        started = time.monotonic()
+        try:
+            sent = await self.send_value(command, dpt, value, label="Funktionstest")
+            status_dpt = self._group_addresses.get(status, {}).get("dpt")
+            compare = status != command and group_monitor.same_kind(
+                dpt or self._group_addresses.get(command, {}).get("dpt"), status_dpt)
+
+            def matches(item: dict[str, Any]) -> bool:
+                return not compare or item.get("value_json") is None or group_monitor.values_match(
+                    sent.get("value_json"), item.get("value_json"), status_dpt or dpt)
+
+            # Bis zur Wartezeit auf den passenden Wert warten – Storen und Dimmer melden Zwischenwerte
+            reply, deadline = None, time.monotonic() + timeout
+            while (remaining := deadline - time.monotonic()) > 0:
+                item = await self._wait_for(queue, status, remaining)
+                if item is None:
+                    break
+                reply = item
+                if matches(item):
+                    break
+            read_used = False
+            if reply is None and read_fallback:
+                read_used = True
+                await self.send_read(status, label="Funktionstest – Status lesen")
+                reply = await self._wait_for(queue, status, min(timeout, 3.0))
+        finally:
+            self.unsubscribe(queue)
+        result = {
+            "command": command, "status": status, "sent": sent.get("value_json"),
+            "received": reply.get("value_json") if reply else None,
+            "received_text": reply.get("value") if reply else None,
+            "source": reply.get("source") if reply else None,
+            "latency_ms": round((time.monotonic() - started) * 1000) if reply else None,
+            "read_used": read_used,
+        }
+        if reply is None:
+            result["result"] = "no_reply"
+            result["message"] = "Keine Rückmeldung – Status-GA, Verknüpfung im Aktor oder Busverbindung prüfen."
+        elif matches(reply):
+            result["result"] = "ok"
+            result["message"] = "Rückmeldung erhalten" + (" (nach Lesen)" if read_used else "")
+        else:
+            result["result"] = "mismatch"
+            result["message"] = "Rückmeldung weicht vom gesendeten Wert ab."
+        return result
+
+    async def _wait_for(self, queue: asyncio.Queue[dict[str, Any]], address: str, timeout: float) -> dict[str, Any] | None:
+        deadline = time.monotonic() + timeout
+        while (remaining := deadline - time.monotonic()) > 0:
+            try:
+                item = await asyncio.wait_for(queue.get(), remaining)
+            except TimeoutError:
+                return None
+            if (item.get("destination") == address and item.get("direction") != "Outgoing"
+                    and item.get("service") in {"GroupValueWrite", "GroupValueResponse"}):
+                return item
+        return None
+
     def subscribe(self) -> asyncio.Queue[dict[str, Any]]:
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=250)
         self._subscribers.add(queue)
@@ -569,20 +731,32 @@ class BusConnection:
         group_address = self._group_addresses.get(destination, {})
         if telegram.decoded_data is not None and isinstance(telegram.decoded_data.value, bool):
             decoded = "1 · Ein/True" if telegram.decoded_data.value else "0 · Aus/False"
+        transcoder = telegram.decoded_data.transcoder if telegram.decoded_data is not None else None
+        dpt = group_address.get("dpt") or (
+            f"{transcoder.dpt_main_number}.{transcoder.dpt_sub_number:03d}"
+            if transcoder is not None and getattr(transcoder, "dpt_sub_number", None) is not None else None)
         item = {
             "time": datetime.now().astimezone().isoformat(timespec="milliseconds"),
             "direction": telegram.direction.value,
             "source": str(telegram.source_address),
             "destination": destination,
             "group_name": group_address.get("name"),
-            "dpt": group_address.get("dpt"),
+            "dpt": dpt,
             "service": type(payload).__name__ if payload is not None else type(telegram.tpci).__name__,
             "value": decoded,
+            "value_json": group_monitor.json_value(telegram.decoded_data.value) if telegram.decoded_data
+            else group_monitor.decode(dpt, getattr(payload, "value", None)),
+            "unit": getattr(transcoder, "unit", None) if transcoder is not None else group_monitor.describe(dpt)["unit"],
+            "hex": group_monitor.payload_hex(getattr(payload, "value", None)),
+            "small": isinstance(getattr(payload, "value", None), DPTBinary),
             "raw": str(payload) if payload is not None else "",
             "secure": telegram.data_secure is True,
         }
+        if item["value"] is None and item["value_json"] is not None:
+            item["value"] = group_monitor.value_text(item["value_json"], item["unit"])
         with suppress(sco.SCOError):
             self._attach_sco(item, payload)
+        self._remember(item)
         self._publish(item)
 
 

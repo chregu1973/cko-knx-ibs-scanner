@@ -10,6 +10,8 @@ from xknxproject import XKNXProj
 from xknxproject.models import MEDIUM_TYPES
 from xknxproject.zip.extractor import extract
 
+from cko_ibs.group_monitor import range_names
+
 
 def _name(value: Any, fallback: str) -> str:
     if isinstance(value, dict):
@@ -233,4 +235,5 @@ def read_project(path: Path, password: str | None = None) -> dict[str, Any]:
             topology, devices, segments, policies, line_media
         ),
         "group_addresses": rows,
+        "group_ranges": range_names(project.get("group_ranges") or {}),
     }

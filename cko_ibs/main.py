@@ -11,8 +11,9 @@ import tempfile
 import urllib.request
 import webbrowser
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
@@ -22,7 +23,7 @@ from pydantic import BaseModel
 from xknx.exceptions import CouldNotParseAddress
 from xknx.telegram.address import GroupAddress
 
-from cko_ibs import __version__, sco, sco_import
+from cko_ibs import __version__, group_monitor, sco, sco_import
 from cko_ibs.bus_connection import bus_connection
 from cko_ibs.knx_discovery import discover_gateways, network_adapters
 from cko_ibs.project_reader import read_project
@@ -288,8 +289,160 @@ async def import_project(
                 status_code=422,
                 detail="ETS-Projekt konnte nicht gelesen werden. Projektpasswort und Datei prüfen.",
             ) from exc
-    bus_connection.configure_group_addresses(summary.pop("group_addresses", []))
+    rows = summary.pop("group_addresses", [])
+    bus_connection.configure_group_addresses(rows, summary.get("group_ranges"))
     return {"project": summary, "stored_on_server": False}
+
+
+# --- Gruppenmonitor: Kacheln, Senden, Funktionstest, Aufnahmen ----------------------
+
+
+class MonitorSendRequest(BaseModel):
+    group_address: str
+    service: str = "write"
+    dpt: str | None = None
+    value: Any = None
+    raw_hex: str | None = None
+    raw_small: bool = False
+    label: str = ""
+
+
+class MonitorDptRequest(BaseModel):
+    group_address: str
+    dpt: str | None = None
+
+
+class SendModeRequest(BaseModel):
+    enabled: bool
+
+
+class FunctionTestRequest(BaseModel):
+    command: str
+    value: Any
+    status: str | None = None
+    dpt: str | None = None
+    timeout: float = 3.0
+    read_fallback: bool = True
+
+
+class MonitorSaveRequest(BaseModel):
+    kind: str
+    content: str
+
+
+class MonitorPathRequest(BaseModel):
+    path: str
+
+
+MONITOR_FILES = {"recording": ("knx-aufnahme", ".json"), "protocol": ("knx-funktionstest", ".html"),
+                 "protocol_csv": ("knx-funktionstest", ".csv"), "telegrams": ("knx-telegramme", ".csv")}
+
+
+def _local_only(request: Request) -> None:
+    if request.client and request.client.host not in {"127.0.0.1", "::1", "localhost", "testclient"}:
+        raise HTTPException(status_code=403, detail="Senden kann nur am eigenen PC freigegeben werden.")
+
+
+def _monitor_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, PermissionError):
+        return HTTPException(status_code=423, detail=str(exc))
+    if isinstance(exc, RuntimeError):
+        return HTTPException(status_code=409, detail=str(exc))
+    if isinstance(exc, group_monitor.MonitorError):
+        return HTTPException(status_code=400, detail=str(exc))
+    return HTTPException(status_code=502, detail=f"Senden fehlgeschlagen: {exc}")
+
+
+@app.get("/api/monitor/groups")
+async def monitor_groups() -> dict:
+    return {"groups": bus_connection.group_rows(), "ranges": bus_connection.range_names,
+            "state": bus_connection.group_state, "pairs": bus_connection.status_pairs(),
+            "send_mode": bus_connection.send_mode()}
+
+
+@app.put("/api/monitor/dpt")
+async def monitor_set_dpt(request: MonitorDptRequest) -> dict:
+    try:
+        row = bus_connection.set_dpt(request.group_address, (request.dpt or "").strip() or None)
+    except group_monitor.MonitorError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"group": row | {"info": group_monitor.describe(row.get("dpt"))}}
+
+
+@app.get("/api/monitor/send-mode")
+async def monitor_send_mode() -> dict:
+    return bus_connection.send_mode()
+
+
+@app.post("/api/monitor/send-mode")
+async def monitor_set_send_mode(request: SendModeRequest, http_request: Request) -> dict:
+    _local_only(http_request)
+    return bus_connection.set_send_mode(request.enabled)
+
+
+@app.post("/api/monitor/send")
+async def monitor_send(request: MonitorSendRequest, http_request: Request) -> dict:
+    _local_only(http_request)
+    try:
+        if request.service == "read":
+            sent = await bus_connection.send_read(request.group_address, request.label[:60])
+        elif request.service == "write":
+            sent = await bus_connection.send_value(request.group_address, request.dpt, request.value,
+                                                   request.raw_hex, request.raw_small, request.label[:60])
+        else:
+            raise group_monitor.MonitorError("Unbekannter Dienst – erlaubt sind «write» und «read».")
+    except (PermissionError, RuntimeError, group_monitor.MonitorError) as exc:
+        raise _monitor_error(exc) from exc
+    except Exception as exc:
+        raise _monitor_error(exc) from exc
+    return {"sent": sent}
+
+
+@app.post("/api/monitor/function-test")
+async def monitor_function_test(request: FunctionTestRequest, http_request: Request) -> dict:
+    _local_only(http_request)
+    try:
+        return await bus_connection.function_test(request.command, request.value, request.status, request.dpt,
+                                                  request.timeout, request.read_fallback)
+    except (PermissionError, RuntimeError, group_monitor.MonitorError) as exc:
+        raise _monitor_error(exc) from exc
+    except Exception as exc:
+        raise _monitor_error(exc) from exc
+
+
+@app.post("/api/monitor/save")
+async def monitor_save(request: MonitorSaveRequest) -> dict:
+    """Aufnahme oder Prüfprotokoll im Downloads-Ordner speichern (das Programmfenster blockiert Downloads)."""
+    if request.kind not in MONITOR_FILES:
+        raise HTTPException(status_code=400, detail="Unbekannter Dateityp.")
+    if len(request.content) > 30 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Die Datei ist zu gross (max. 30 MB).")
+    stem, suffix = MONITOR_FILES[request.kind]
+    folder = downloads_dir()
+    base = f"{stem}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    target, counter = folder / f"{base}{suffix}", 2
+    while target.exists():
+        target, counter = folder / f"{base}-{counter}{suffix}", counter + 1
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        target.write_text(request.content, encoding="utf-8-sig" if suffix == ".csv" else "utf-8", newline="")
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Datei konnte nicht gespeichert werden: {exc}") from exc
+    return {"path": str(target), "folder": str(folder), "filename": target.name}
+
+
+@app.post("/api/monitor/open")
+def monitor_open(request: MonitorPathRequest) -> dict:
+    """Gespeicherte Datei des Gruppenmonitors im Explorer zeigen bzw. das Prüfprotokoll im Browser öffnen."""
+    target = Path(request.path).resolve()
+    if target.parent != downloads_dir().resolve() or not target.is_file() or not target.name.startswith("knx-"):
+        raise HTTPException(status_code=400, detail="Nur eigene Dateien des Gruppenmonitors können geöffnet werden.")
+    if target.suffix == ".html":
+        return {"opened": bool(webbrowser.open(target.as_uri())), "path": str(target)}
+    if sys.platform != "win32":
+        return {"opened": False, "path": str(target)}
+    subprocess.Popen(["explorer", f"/select,{target}"])
+    return {"opened": True, "path": str(target)}
 
 
 # --- SCO-Objekt (6 Byte) ------------------------------------------------------

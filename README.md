@@ -3,6 +3,19 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.1.0
+
+Gruppenmonitor zum Beobachten, Bedienen und Testen – mit oder ohne ETS-Projekt:
+
+- **Live-Kacheln:** jede Gruppenadresse als Kachel nach Haupt-/Mittelgruppe oder Funktion. Lampen leuchten, Dimmer füllen sich, Storen fahren, Thermometer, CO₂-Ampel, Wind-Rad, RGB-Farbe, Betriebsart. Jede Kachel pulsiert beim Telegramm (Schreiben, Lesen, Antwort, eigenes Senden).
+- **Bedienen:** Klick auf die Kachel öffnet das passende Bedienelement (Ein/Aus, Auf/Ab, Dimmen, Prozent-Regler, Wert, Szene, Farbe, Betriebsart) und «Wert lesen». Senden ist gesperrt, bis es oben für 30 Minuten freigegeben wird.
+- **Ohne Projekt:** Gruppenadressen erscheinen mit dem ersten Telegramm; Datentyp pro Kachel festlegen oder Rohwert (Hex) senden.
+- **Bus-Netz:** animierte Ansicht – Sender (nach Linie) links, Gruppenadressen rechts, jedes Telegramm fliegt als Lichtpunkt über den Bus.
+- **Busaktivität:** Telegramme pro Sekunde, geschätzte Buslast, aktivster Sender, Live-Ticker.
+- **Funktionstest mit Rückmeldung:** Befehls- und Status-Adressen werden aus dem Projekt zugeordnet; Befehl senden, auf den passenden Statuswert warten (bei Bedarf nachlesen), Ergebnis mit Antwortzeit, Prüfprotokoll als HTML und CSV.
+- **Aufnahme & Wiedergabe:** Busverkehr mit Zeitstempeln aufnehmen, speichern, laden, animiert abspielen (1–10×) und auf Wunsch die Schreib-Telegramme erneut auf den Bus senden.
+- Telegrammliste als CSV speichern; Windows-Build mit selbst übersetztem PyInstaller-Bootloader (weniger Fehlalarme von Virenscannern).
+
 ## Version 1.0.11
 
 - SCO-Vorschläge: Gruppenadressen ohne verknüpftes Kommunikationsobjekt werden nur noch bei eindeutigem Namen vorgeschlagen («Griesser», «SCO», «SunControl», «6 Byte»). «Sektor» allein reicht nicht mehr – damit erscheinen keine 1-Bit-Adressen wie «Fensterreinigung | Sektor 2» mehr.

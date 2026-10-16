@@ -35,4 +35,4 @@ exe = EXE(
     icon=str(root / "assets" / "cko-toolbox.ico"),
     version=str(root / "installer" / "version-info.txt"),
 )
-coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=True, name="CKO-KNX-IBS")
+coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="CKO-KNX-IBS")

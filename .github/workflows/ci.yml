@@ -31,6 +31,18 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -e .[dev]
+      # Bootloader aus dem Quellcode übersetzen statt die vorgefertigte runw.exe zu verwenden:
+      # die Standard-Bootloader werden von Virenscannern (ML-Erkennung, z. B. Wacatac!ml) oft fälschlich gemeldet.
+      - name: PyInstaller mit eigenem Bootloader
+        shell: pwsh
+        run: |
+          $version = python -c "import PyInstaller; print(PyInstaller.__version__)"
+          git clone --quiet --depth 1 --branch "v$version" https://github.com/pyinstaller/pyinstaller.git "$env:RUNNER_TEMP\pyinstaller"
+          Push-Location "$env:RUNNER_TEMP\pyinstaller\bootloader"
+          python ./waf all --target-arch=64bit
+          if ($LASTEXITCODE -ne 0) { throw "Bootloader konnte nicht übersetzt werden." }
+          Pop-Location
+          pip install "$env:RUNNER_TEMP\pyinstaller"
       - run: pyinstaller --noconfirm cko-knx-ibs.spec
       - name: Sign application when certificate is configured
         if: env.CKO_SIGNING_CERTIFICATE_BASE64 != ''
