@@ -44,7 +44,16 @@ function showView(view) {
     button.classList.toggle("active", button.dataset.view === view);
   });
   if (view === "monitor") renderMonitor();
+  window.dispatchEvent(new CustomEvent("knx-view", {detail: {view}}));
+  document.querySelector("main")?.scrollTo?.({top: 0});
+  window.scrollTo({top: 0});
 }
+
+// «Weiter zu Schritt …» und Links zwischen den Seiten
+document.addEventListener("click", (event) => {
+  const target = event.target.closest("[data-go-view]");
+  if (target) showView(target.dataset.goView);
+});
 
 document.querySelectorAll(".nav-item[data-view]").forEach((button) => {
   button.addEventListener("click", () => showView(button.dataset.view));
@@ -217,6 +226,7 @@ byId("test-connection-button").addEventListener("click", async () => {
     byId("device-scan-button").disabled = projectDevices.length === 0;
     busConnected = true;
     updateMonitorConnectionBadge();
+    window.dispatchEvent(new CustomEvent("knx-connection", {detail: {connected: true, status: data}}));
     byId("disconnect-button").hidden = false;
     startMonitor();
   } catch (error) {
@@ -248,6 +258,7 @@ byId("disconnect-button").addEventListener("click", async () => {
     }
     busConnected = false;
     updateMonitorConnectionBadge();
+    window.dispatchEvent(new CustomEvent("knx-connection", {detail: {connected: false}}));
     byId("connection-badge").className = "badge muted";
     byId("connection-badge").textContent = "○ Nicht verbunden";
     byId("connection-message").className = "message success";
@@ -419,8 +430,11 @@ byId("project-form").addEventListener("submit", async (event) => {
     byId("device-count-label").textContent = placeholders ? `Geräte · davon ${placeholders} Platzhalter` : "Geräte";
     byId("device-count-card").title = placeholders ? `${placeholders} Platzhalter-/Dummy-Geräte im Projekt werden nicht am Bus geprüft.` : "";
     message.textContent = `${project.device_count} Geräte und ${project.group_address_count} Gruppenadressen eingelesen.`;
+    byId("project-step-status").className = "good-text";
+    byId("project-step-status").textContent = `✓ ${project.name}: ${project.device_count} Geräte · ${project.group_address_count} Gruppenadressen${project.buildings?.length ? " · Gebäudestruktur vorhanden" : ""}. Weiter mit der Verbindung.`;
     const topology = byId("topology");
     renderTopology(project.topology, project.devices);
+    window.dispatchEvent(new CustomEvent("knx-project", {detail: project}));
     populateDiagnosticLines(project.topology);
     updateTopologySummaries();
     byId("device-scan-button").disabled = projectDevices.length === 0 || byId("connection-badge").classList.contains("muted");
@@ -740,10 +754,16 @@ function updateMonitorConnectionBadge() {
   if (!busConnected) stopMonitor();
 }
 
+let monitorRenderPending = false;
 function addTelegram(telegram) {
   monitorTelegrams.unshift(telegram);
   if (monitorTelegrams.length > 2000) monitorTelegrams.length = 2000;
-  renderMonitor();
+  // Kacheln, Bus-Netz und Aufnahme (groupmonitor.js) hören auf dieses Ereignis
+  window.dispatchEvent(new CustomEvent("knx-telegram", {detail: telegram}));
+  // Tabelle höchstens einmal pro Bild neu zeichnen – bei viel Busverkehr bleibt die Oberfläche flüssig
+  if (monitorRenderPending) return;
+  monitorRenderPending = true;
+  requestAnimationFrame(() => { monitorRenderPending = false; renderMonitor(); });
 }
 
 function monitorMatches(telegram) {
@@ -762,6 +782,7 @@ function renderMonitor() {
   const filtered = monitorTelegrams.filter(monitorMatches);
   const rows = filtered.slice(0, 500);
   byId("monitor-total-count").textContent = monitorTelegrams.length;
+  if (byId("gm-tab-count")) byId("gm-tab-count").textContent = monitorTelegrams.length;
   byId("monitor-visible-count").textContent = filtered.length;
   const filtersActive = Boolean(
     byId("monitor-search").value.trim()
@@ -881,3 +902,41 @@ byId("update-check-toggle").addEventListener("change", (event) => {
   checkForUpdate();
 });
 checkForUpdate();
+
+// Bestehende KNX-Verbindung nach einem Neuladen der Oberfläche wieder anzeigen (z. B. nach «Zurücksetzen»)
+async function restoreConnectionState() {
+  try {
+    const status = await (await fetch("/api/knx/status")).json();
+    if (!status.connected) return;
+    busConnected = true;
+    byId("connection-badge").className = "badge good";
+    byId("connection-badge").textContent = `✓ ${status.connection_mode || "KNX"} · KNX ${status.individual_address || "?"}`;
+    byId("disconnect-button").hidden = false;
+    byId("connection-message").className = "message success";
+    byId("connection-message").textContent = "KNX-Verbindung besteht weiterhin.";
+    updateMonitorConnectionBadge();
+    startMonitor();
+    window.dispatchEvent(new CustomEvent("knx-connection", {detail: {connected: true, status}}));
+  } catch { /* ohne Antwort bleibt «Nicht verbunden» */ }
+}
+restoreConnectionState();
+
+// Projektwechsel: alles leeren, KNX-Verbindung bleibt
+document.querySelectorAll("[data-session-reset]").forEach((button) => button.addEventListener("click", async () => {
+  if (!window.confirm("Alles zurücksetzen für ein neues Projekt?\n\nProjekt, Gruppenadressen, Kacheln, Telegramme, Funktionstests, festgelegte Datentypen und SCO-Mitschnitt werden geleert. Nicht gespeicherte Aufnahmen gehen verloren.\n\nDie KNX-Verbindung bleibt bestehen.")) return;
+  let clearKeyring = true;
+  try {
+    const secure = await (await fetch("/api/knx/data-secure")).json();
+    if (secure.loaded) clearKeyring = window.confirm("Den geladenen Data-Secure-Schlüsselbund ebenfalls entfernen?\n\nOK = entfernen (anderes Projekt) · Abbrechen = behalten");
+  } catch { /* Standard: entfernen */ }
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/session/reset", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({clear_keyring: clearKeyring})});
+    if (!response.ok) throw new Error((await response.json()).detail || "Zurücksetzen fehlgeschlagen");
+    try { ["cko-ibs-gm-dpts", "cko-ibs-gm-recent"].forEach((key) => localStorage.removeItem(key)); } catch { /* optional */ }
+    location.reload();
+  } catch (error) {
+    button.disabled = false;
+    window.alert(error.message);
+  }
+}));

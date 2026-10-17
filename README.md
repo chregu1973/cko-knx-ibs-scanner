@@ -3,6 +3,26 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.1.0
+
+Neuer Aufbau in sechs Schritten: **1 Projekt** (ETS-Projekt, Projektpasswort und Secure-Schlüsselbund – alles optional) · **2 Verbindung** (einrichten und Linie scannen) · **3 Gruppenmonitor** · **4 Topologie & Geräte** · **5 SCO-Objekt** · **6 Gebäude**. «↺ Zurücksetzen» leert alles für ein neues Projekt, die KNX-Verbindung bleibt bestehen.
+
+- **Schnellbedienung in jeder Ansicht:** Gruppenadresse oder Name eingeben, Wert, «Lesen»/«Senden»/«Umschalten» – die Rückmeldung (auch auf der zugehörigen Status-Adresse) erscheint direkt daneben mit Antwortzeit.
+- **Gebäude:** Haus mit Etagen und Räumen aus der ETS-Gebäudestruktur; Räume leuchten bei Busaktivität und zeigen den letzten Wert. Klick auf einen Raum zeigt Funktionen, Gruppenadressen mit aktuellen Werten und Geräte.
+- **Datentyp ohne Projekt-DPT:** DPT vom verknüpften Kommunikationsobjekt, sonst vermutet aus Name/Einheit und Telegrammlänge (wie die ETS) und als «vermutet» gekennzeichnet; pro Kachel bestätigen oder ändern – gilt sofort, auch für den letzten Wert.
+
+Gruppenmonitor zum Beobachten, Bedienen und Testen – mit oder ohne ETS-Projekt:
+
+- **Live-Kacheln:** jede Gruppenadresse als Kachel nach Haupt-/Mittelgruppe oder Funktion. Lampen leuchten, Dimmer füllen sich, Storen fahren, Thermometer, CO₂-Ampel, Wind-Rad, RGB-Farbe, Betriebsart. Jede Kachel pulsiert beim Telegramm (Schreiben, Lesen, Antwort, eigenes Senden).
+- **Bedienen:** Klick auf die Kachel öffnet das passende Bedienelement (Ein/Aus, Auf/Ab, Dimmen, Prozent-Regler, Wert, Szene, Farbe, Betriebsart) und «Wert lesen». Senden ist gesperrt, bis es oben für 30 Minuten freigegeben wird.
+- **Ohne Projekt:** Gruppenadressen erscheinen mit dem ersten Telegramm; Datentyp pro Kachel festlegen oder Rohwert (Hex) senden.
+- **Bus-Netz:** animierte Ansicht – Sender (nach Linie) links, Gruppenadressen rechts, jedes Telegramm fliegt als Lichtpunkt über den Bus.
+- **Busaktivität:** Telegramme pro Sekunde, geschätzte Buslast, aktivster Sender, Live-Ticker.
+- **Funktionstest mit Rückmeldung:** in vier erklärten Schritten. Bedienbare Befehls- und Status-Adressen werden aus dem Projekt vorgeschlagen (Melder wie Magnetkontakte nie), aber nicht vorausgewählt; gruppiert nach Haupt-/Mittelgruppe oder Funktion, Suche und Filter («nur Fehler»), ganze Gruppe testen, Tests einzeln/ausgewählt/alle entfernen. Wartet auf den passenden Statuswert (bei Bedarf nachlesen), Ergebnis mit Antwortzeit, Prüfprotokoll als HTML und CSV.
+- **Aufnahme & Wiedergabe:** Busverkehr mit Zeitstempeln aufnehmen, speichern, laden, animiert abspielen (1–10×) und auf Wunsch die Schreib-Telegramme erneut auf den Bus senden.
+- **KNX Data Secure für jede Verbindungsart** (KNX/IP UDP/TCP, TCP Secure, USB): ETS-Schlüsselbund (.knxkeys) in der Übersicht laden – verschlüsselte Gruppenadressen werden lesbar, mit 🔒 markiert und lassen sich schalten. Ohne Schlüssel erscheinen Secure-Telegramme als «🔒 Schlüssel fehlt» statt zu verschwinden. Der Scanner zeigt, ob die aktuelle Quelladresse als Data-Secure-Sender eingetragen ist, und schlägt passende Tunneladressen aus dem Schlüsselbund vor. Schlüssel bleiben nur im Arbeitsspeicher.
+- Telegrammliste als CSV speichern; Windows-Build mit selbst übersetztem PyInstaller-Bootloader (weniger Fehlalarme von Virenscannern).
+
 ## Version 1.0.11
 
 - SCO-Vorschläge: Gruppenadressen ohne verknüpftes Kommunikationsobjekt werden nur noch bei eindeutigem Namen vorgeschlagen («Griesser», «SCO», «SunControl», «6 Byte»). «Sektor» allein reicht nicht mehr – damit erscheinen keine 1-Bit-Adressen wie «Fensterreinigung | Sektor 2» mehr.

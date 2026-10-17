@@ -5,11 +5,13 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>CKO KNX IBS Scanner</title>
     <link rel="icon" href="/static/cko-toolbox-logo.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=1.0.11" />
-    <link rel="stylesheet" href="/static/connection.css?v=1.0.11" />
-    <link rel="stylesheet" href="/static/branding.css?v=1.0.11" />
-    <link rel="stylesheet" href="/static/sco.css?v=1.0.11" />
-    <link rel="stylesheet" href="/static/light.css?v=1.0.11" />
+    <link rel="stylesheet" href="/static/styles.css?v=1.1.0" />
+    <link rel="stylesheet" href="/static/connection.css?v=1.1.0" />
+    <link rel="stylesheet" href="/static/branding.css?v=1.1.0" />
+    <link rel="stylesheet" href="/static/sco.css?v=1.1.0" />
+    <link rel="stylesheet" href="/static/groupmonitor.css?v=1.1.0" />
+    <link rel="stylesheet" href="/static/building.css?v=1.1.0" />
+    <link rel="stylesheet" href="/static/light.css?v=1.1.0" />
     <script>
       // Design vor dem ersten Zeichnen setzen: gespeicherte Wahl, sonst Windows-Einstellung
       (function () {
@@ -26,15 +28,15 @@
     <aside class="sidebar">
       <div class="brand"><img class="brand-mark" src="/static/cko-toolbox-logo.png" alt="CKO" /><div><strong>KNX IBS</strong><small>Scanner</small></div></div>
       <nav>
-        <button id="overview-nav" class="nav-item active" type="button" data-view="overview">⌂ <span>Übersicht</span></button>
-        <button id="monitor-nav" class="nav-item" type="button" data-view="monitor">↯ <span>Gruppenmonitor</span></button>
-        <button id="sco-nav" class="nav-item" type="button" data-view="sco">⇅ <span>SCO-Objekt</span></button>
-        <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">▦ <span>Gebäude<small>folgt</small></span></button>
-        <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">✓ <span>Prüfungen<small>folgt</small></span></button>
-        <button class="nav-item planned" hidden disabled title="Dieser Bereich folgt in einer späteren Version">▤ <span>Protokoll<small>folgt</small></span></button>
+        <button id="project-nav" class="nav-item active" type="button" data-view="project"><b>1</b> <span>Projekt</span></button>
+        <button id="connection-nav" class="nav-item" type="button" data-view="connection"><b>2</b> <span>Verbindung</span></button>
+        <button id="monitor-nav" class="nav-item" type="button" data-view="monitor"><b>3</b> <span>Gruppenmonitor</span></button>
+        <button id="topology-nav" class="nav-item" type="button" data-view="topology"><b>4</b> <span>Topologie &amp; Geräte</span></button>
+        <button id="sco-nav" class="nav-item" type="button" data-view="sco"><b>5</b> <span>SCO-Objekt</span></button>
+        <button id="building-nav" class="nav-item" type="button" data-view="building"><b>6</b> <span>Gebäude</span></button>
       </nav>
       <a id="update-banner" class="update-banner" href="https://toolbox.ckoeppen.ch/tools/knx-inspector/#download" data-external="download" target="_blank" rel="noopener" hidden>⬆ <span id="update-banner-text">Neue Version verfügbar</span><small>Zur Download-Seite</small></a>
-      <div class="sidebar-version"><span>Installierte Version</span><strong id="sidebar-version">KNX IBS Scanner 1.0.11</strong>
+      <div class="sidebar-version"><span>Installierte Version</span><strong id="sidebar-version">KNX IBS Scanner 1.1.0</strong>
         <label class="update-toggle" title="Fragt beim Start einmal die öffentliche Versionsliste der CKO Toolbox ab. Es werden keine Projekt- oder Anlagendaten übertragen."><input id="update-check-toggle" type="checkbox" checked /> Beim Start auf Updates prüfen</label></div>
       <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">☀ Helles Design</button>
       <a class="feedback-button" href="https://feedback.toolbox.ckoeppen.ch/?tool=KNX%20IBS%20Scanner" data-external="feedback" target="_blank" rel="noopener">✉ Fehler oder Idee melden</a>
@@ -43,22 +45,26 @@
     </aside>
 
     <main>
-      <div id="overview-view" class="app-view">
-      <header>
-        <div><p class="eyebrow">LOKALE WINDOWS-ANWENDUNG</p><h1 id="project-name">KNX IBS Scanner</h1></div>
-        <div class="header-actions"><span id="project-badge" class="badge muted">○ Kein ETS-Projekt</span><span id="connection-badge" class="badge muted">○ Nicht verbunden</span></div>
-      </header>
-
-      <section class="stats">
-        <article id="device-count-card"><span class="stat-icon blue">▣</span><div><strong id="device-count">0</strong><p id="device-count-label">Geräte</p></div></article>
-        <article><span class="stat-icon green">✓</span><div><strong>0</strong><p>OK</p></div></article>
-        <article><span class="stat-icon red">×</span><div><strong>0</strong><p>Fehler</p></div></article>
-        <article title="Geräte, die noch nicht am Bus geprüft wurden – «Geräte prüfen» bei der Topologie startet die Prüfung. Platzhalter-/Dummy-Geräte werden nicht geprüft."><span class="stat-icon orange">?</span><div><strong id="open-count">0</strong><p>ungeprüft</p></div></article>
+      <section id="quickbar" class="quickbar" aria-label="Schnellbedienung">
+        <span class="qb-title" title="Gruppenadresse direkt lesen oder senden – in jeder Ansicht">⚡ Schnell</span>
+        <label class="qb-ga"><input id="qb-ga" list="gm-ga-list" placeholder="GA oder Name, z. B. 1/1/5" autocomplete="off" spellcheck="false" /><small id="qb-info">Gruppenadresse eingeben</small></label>
+        <input id="qb-dpt" class="qb-dpt" list="gm-dpt-list" placeholder="DPT" autocomplete="off" title="Datentyp – aus dem Projekt bzw. vermutet; hier überschreibbar" />
+        <input id="qb-value" class="qb-value" placeholder="Wert: ein, aus, 50, 21.5 …" autocomplete="off" />
+        <button id="qb-read" class="secondary" type="button" title="GroupValueRead senden">Lesen</button>
+        <button id="qb-toggle" class="secondary" type="button" title="1-Bit-Wert umschalten" hidden>Umschalten</button>
+        <button id="qb-send" class="primary" type="button" title="GroupValueWrite senden (Enter)">Senden</button>
+        <span id="qb-result" class="qb-result" aria-live="polite"></span>
+        <div id="qb-recent" class="qb-recent"></div>
       </section>
-
-      <section class="workspace-grid">
+      <div id="project-view" class="app-view">
+      <header>
+        <div><p class="eyebrow">SCHRITT 1 · PROJEKT</p><h1 id="project-name">KNX IBS Scanner</h1><p class="page-lead">ETS-Projekt und Schlüssel laden – alles bleibt lokal auf diesem PC.</p></div>
+        <div class="header-actions"><button class="session-reset" type="button" data-session-reset title="Projekt wechseln: alle Anzeigen leeren, die KNX-Verbindung bleibt bestehen">↺ Zurücksetzen</button><span id="project-badge" class="badge muted">○ Kein ETS-Projekt</span></div>
+      </header>
+      <section class="step-hint"><strong>Ein Projekt ist kein Muss.</strong> Fast alle Funktionen – Verbindung, Linien-Scan, Gruppenmonitor, Senden, Funktionstest, Aufnahme und SCO-Objekt – funktionieren auch ohne ETS-Projekt. Mit Projekt erscheinen Namen, Datentypen, Topologie und Gebäude. <button type="button" class="link-button" data-go-view="connection">Direkt zu Schritt 2: Verbindung →</button></section>
+      <section class="workspace-grid project-grid">
         <article class="panel import-panel">
-          <div class="panel-heading"><div><p class="eyebrow">SCHRITT 1</p><h2>ETS-Projekt laden</h2></div><span class="privacy">Nur lokal verarbeitet</span></div>
+          <div class="panel-heading"><div><p class="eyebrow">ETS-PROJEKT</p><h2>Projektdatei laden (optional)</h2></div><span class="privacy">Nur lokal verarbeitet</span></div>
           <form id="project-form">
             <label class="dropzone" for="project-file"><span>⇧</span><strong>.knxproj auswählen</strong><small>ETS 4, ETS 5 oder ETS 6 · maximal 250 MB</small></label>
             <input id="project-file" name="project" type="file" accept=".knxproj" required />
@@ -67,9 +73,38 @@
           </form>
           <p id="project-message" class="message"></p>
         </article>
+        <article class="panel secure-panel">
+          <div class="panel-heading"><div><p class="eyebrow">SCHLÜSSEL &amp; PASSWÖRTER</p><h2>KNX Secure (optional)</h2></div><span class="privacy">Nur im Arbeitsspeicher</span></div>
+          <p class="panel-intro">Für Anlagen mit <b>KNX Data Secure</b> (verschlüsselte Gruppenadressen) oder <b>KNX IP Secure</b> (verschlüsselter Tunnel): den ETS-Schlüsselbund hier einmal laden. Er gilt für alle Verbindungsarten und auch für den Secure-Tunnel in Schritt 2.</p>
+          <details id="data-secure-controls" class="secure-controls data-secure-controls" open>
+            <summary class="secure-heading"><span>🔒</span><div><strong>KNX Data Secure <em id="ds-badge" class="ds-badge">nicht geladen</em></strong><small>Verschlüsselte Gruppenadressen lesen und schalten – für jede Verbindungsart (KNX/IP, Secure, USB). Schlüssel bleiben nur im Arbeitsspeicher.</small></div></summary>
+            <div class="secure-grid">
+              <label class="secure-file">ETS-Schlüsselbund (.knxkeys)
+                <span id="ds-file-label">.knxkeys auswählen</span>
+                <input id="ds-file" type="file" accept=".knxkeys" />
+              </label>
+              <label>Passwort der .knxkeys
+                <input id="ds-password" type="password" autocomplete="off" placeholder="beim Export in der ETS vergeben" />
+              </label>
+            </div>
+            <div class="ds-actions"><button id="ds-load" class="secondary" type="button">Schlüsselbund laden</button><button id="ds-clear" class="secondary" type="button" hidden>Entfernen</button></div>
+            <p id="ds-message" class="message"></p>
+            <div id="ds-status" class="ds-status" hidden></div>
+            <p class="ds-hint">Export in der ETS: Projekt › Sicherheit › Schlüsselbund exportieren. Lesen funktioniert mit jeder Quelladresse; <b>Senden</b> an Data-Secure-Adressen nur mit einer Tunneladresse, die in der ETS als Sender eingetragen ist (siehe Liste nach dem Laden).</p>
+          </details>
+        </article>
+      </section>
+      <div class="step-footer"><span id="project-step-status" class="muted">Noch kein Projekt geladen – du kannst trotzdem weitermachen.</span><button type="button" class="primary" data-go-view="connection">Weiter zu Schritt 2: Verbindung →</button></div>
+      </div>
 
+      <div id="connection-view" class="app-view" hidden>
+      <header>
+        <div><p class="eyebrow">SCHRITT 2 · VERBINDUNG</p><h1>KNX-Verbindung einrichten &amp; testen</h1><p class="page-lead">Schnittstelle suchen, verbinden und Teilnehmer einer Linie finden.</p></div>
+        <div class="header-actions"><span id="connection-badge" class="badge muted">○ Nicht verbunden</span></div>
+      </header>
+      <section class="workspace-grid connection-grid">
         <article class="panel gateway-panel">
-          <div class="panel-heading"><div><p class="eyebrow">SCHRITT 2</p><h2 id="connection-heading">KNX-Schnittstelle</h2></div><button id="scan-button" class="primary">⟳ Schnittstellen suchen</button></div>
+          <div class="panel-heading"><div><p class="eyebrow">KNX-SCHNITTSTELLE</p><h2 id="connection-heading">Verbindung einrichten</h2></div><button id="scan-button" class="primary">⟳ Schnittstellen suchen</button></div>
           <div class="connection-controls">
             <label id="adapter-field">Windows-Netzwerkadapter
               <select id="adapter-select"><option value="">Automatisch auswählen</option></select>
@@ -96,6 +131,7 @@
           <div id="tunnel-diagnostic" class="tunnel-diagnostic" hidden></div>
           <div id="secure-controls" class="secure-controls" hidden>
             <div class="secure-heading"><span>♢</span><div><strong>KNX IP Secure</strong><small>Schlüssel werden nur lokal im Arbeitsspeicher verwendet.</small></div></div>
+            <p id="secure-keyring-note" class="ds-hint">Tipp: Den Schlüsselbund einmal in <button type="button" class="link-button" data-go-view="project">Schritt 1 «Projekt»</button> laden – dann muss hier nichts mehr ausgewählt werden.</p>
             <div class="secure-grid">
               <label class="secure-file">ETS Keyring
                 <span id="keyring-file-label">.knxkeys auswählen</span>
@@ -115,7 +151,6 @@
           <div id="gateway-list" class="empty-state"><span>⌁</span><strong>Noch keine Suche durchgeführt</strong><small>KNX/IP wird im Netzwerk gesucht; USB-Schnittstellen werden lokal erkannt.</small></div>
         </article>
       </section>
-
       <section class="panel address-scan-panel">
         <div class="panel-heading"><div><p class="eyebrow standalone-scan-label">OHNE ETS-PROJEKT NUTZBAR</p><h2>Physikalische Adressen suchen</h2></div><span class="badge info">KNX-Linienscan</span></div>
         <div class="address-scan-controls">
@@ -136,7 +171,19 @@
           <div id="device-info-result" class="device-info-empty">Adresse auswählen und Gerätedaten lesen.</div>
         </section>
       </section>
+      <div class="step-footer"><span class="muted">Nach dem Verbinden startet der Gruppenmonitor automatisch.</span><button type="button" class="primary" data-go-view="monitor">Weiter zu Schritt 3: Gruppenmonitor →</button></div>
+      </div>
 
+      <div id="topology-view" class="app-view" hidden>
+      <header>
+        <div><p class="eyebrow">SCHRITT 4 · TOPOLOGIE</p><h1>Topologie &amp; Geräteprüfung</h1><p class="page-lead">Bereiche, Linien und Geräte aus dem ETS-Projekt – am Bus prüfen, ob alle antworten.</p></div>
+      </header>
+      <section class="stats">
+        <article id="device-count-card"><span class="stat-icon blue">▣</span><div><strong id="device-count">0</strong><p id="device-count-label">Geräte</p></div></article>
+        <article><span class="stat-icon green">✓</span><div><strong>0</strong><p>OK</p></div></article>
+        <article><span class="stat-icon red">×</span><div><strong>0</strong><p>Fehler</p></div></article>
+        <article title="Geräte, die noch nicht am Bus geprüft wurden – «Geräte prüfen» bei der Topologie startet die Prüfung. Platzhalter-/Dummy-Geräte werden nicht geprüft."><span class="stat-icon orange">?</span><div><strong id="open-count">0</strong><p>ungeprüft</p></div></article>
+      </section>
       <section class="panel topology-panel">
         <div class="panel-heading"><div><p class="eyebrow">PROJEKTÜBERSICHT</p><h2>KNX-Topologie</h2></div><div class="topology-actions"><span class="legend"><i class="dot gray"></i> ungeprüft <i class="dot green"></i> OK <i class="dot blue-dot"></i> Info <i class="dot orange"></i> Warnung <i class="dot red"></i> Fehler</span><label class="diagnostic-line-label">Diagnoseumfang<select id="diagnostic-line-select" disabled><option value="">Alle Linien</option></select></label><button id="device-scan-button" class="primary" type="button" disabled>Geräte prüfen</button></div></div>
         <div id="scan-progress" class="scan-progress" hidden><span></span><small>0 / 0 Geräte geprüft</small></div>
@@ -149,15 +196,54 @@
       </div>
 
       <div id="monitor-view" class="app-view" hidden>
-        <header class="monitor-page-header">
-          <div><p class="eyebrow">LIVE · NUR LESEN</p><h1>KNX-Gruppenmonitor</h1><p class="page-lead">Telegramme live beobachten, anhalten und gezielt nach Gruppenadressen oder Projektbezeichnungen durchsuchen.</p></div>
-          <div class="header-actions"><span id="monitor-connection-badge" class="badge muted">○ Nicht verbunden</span><span id="monitor-state" class="badge muted">○ Monitor wartet</span></div>
+        <header class="monitor-page-header gm-header">
+          <div><p class="eyebrow">SCHRITT 3 · GRUPPENMONITOR</p><h1>KNX-Gruppenmonitor</h1><p class="page-lead">Busverkehr live sehen, Gruppenadressen schalten und Funktionen mit Rückmeldung prüfen – mit oder ohne ETS-Projekt.</p></div>
+          <div class="header-actions"><button class="session-reset" type="button" data-session-reset title="Projekt wechseln: alle Anzeigen leeren, die KNX-Verbindung bleibt bestehen">↺ Zurücksetzen</button><span id="monitor-connection-badge" class="badge muted">○ Nicht verbunden</span><span id="monitor-state" class="badge muted">○ Monitor wartet</span><button id="gm-send-mode" class="gm-send-mode" type="button" title="Senden ist gesperrt. Klicken, um Senden für 30 Minuten freizugeben.">◉ Nur beobachten</button></div>
         </header>
+        <section class="gm-pulse" aria-label="Busaktivität">
+          <div class="gm-pulse-chart"><canvas id="gm-rate-canvas" height="54"></canvas><span><strong id="gm-rate">0</strong> Telegramme/s</span></div>
+          <div class="gm-pulse-stat"><small>Buslast (TP, geschätzt)</small><div class="gm-load"><i id="gm-load-bar"></i></div><strong id="gm-load">0 %</strong></div>
+          <div class="gm-pulse-stat"><small>Telegramme</small><strong id="gm-total">0</strong><span id="gm-active-groups">0 aktive Gruppen</span></div>
+          <div class="gm-pulse-stat"><small>Aktivster Sender</small><strong id="gm-top-source">–</strong><span id="gm-top-source-name">&nbsp;</span></div>
+          <div class="gm-ticker" id="gm-ticker" aria-live="off"><span class="gm-ticker-empty">Warte auf Telegramme …</span></div>
+        </section>
+        <nav class="gm-tabs" role="tablist">
+          <button class="active" type="button" role="tab" data-gm-tab="tiles">▦ Live-Kacheln</button>
+          <button type="button" role="tab" data-gm-tab="net">✦ Bus-Netz</button>
+          <button type="button" role="tab" data-gm-tab="telegrams">☰ Telegramme <b id="gm-tab-count">0</b></button>
+          <button type="button" role="tab" data-gm-tab="test">✓ Funktionstest</button>
+          <button type="button" role="tab" data-gm-tab="rec">● Aufnahme</button>
+        </nav>
+        <p id="gm-tab-help" class="gm-tab-help"></p>
+        <div id="gm-replay-banner" class="gm-replay-banner" hidden>▶ Wiedergabe einer Aufnahme – Kacheln und Bus-Netz zeigen die aufgezeichneten Telegramme. <button id="gm-replay-stop-banner" type="button">Wiedergabe beenden</button></div>
+
+        <section class="gm-pane" data-gm-pane="tiles">
+          <div class="gm-toolbar">
+            <label class="gm-search">Suchen<input id="gm-tile-search" type="search" placeholder="Name, Gruppenadresse oder Wert – z. B. Küche, 1/1/5" autocomplete="off" /></label>
+            <label>Anzeigen<select id="gm-tile-filter"><option value="all">Alle Gruppenadressen</option><option value="active">Nur mit Telegrammen</option><option value="control">Nur bedienbare</option><option value="status">Nur Status/Messwerte</option></select></label>
+            <label>Gruppieren<select id="gm-tile-grouping"><option value="middle">Haupt- und Mittelgruppe</option><option value="main">Hauptgruppe</option><option value="kind">Funktion (Licht, Storen, Klima …)</option></select></label>
+            <button id="gm-read-all" class="secondary" type="button" title="Sendet nacheinander Lese-Anfragen an alle angezeigten Status-/Messwert-Adressen (ca. 6 pro Sekunde)">⟳ Werte lesen</button>
+          </div>
+          <div id="gm-tile-hint" class="gm-hint"></div>
+          <div id="gm-tile-groups" class="gm-tile-groups"></div>
+        </section>
+
+        <section class="gm-pane" data-gm-pane="net" hidden>
+          <div class="gm-toolbar gm-net-toolbar">
+            <div class="gm-legend"><span class="write">Schreiben</span><span class="read">Lesen</span><span class="response">Antwort</span><span class="own">vom Scanner gesendet</span></div>
+            <label class="gm-check"><input id="gm-net-labels" type="checkbox" checked /> Namen anzeigen</label>
+            <button id="gm-net-clear" class="secondary" type="button">Netz leeren</button>
+          </div>
+          <div class="gm-net-wrap"><canvas id="gm-net-canvas"></canvas><div id="gm-net-tip" class="gm-net-tip" hidden></div><div id="gm-net-empty" class="gm-net-empty"><span>✦</span><strong>Das Bus-Netz baut sich mit dem Verkehr auf</strong><small>Links die sendenden Geräte (nach Linie), rechts die Gruppenadressen – jedes Telegramm fliegt als Lichtpunkt über den Bus.</small></div></div>
+        </section>
+
+        <section class="gm-pane" data-gm-pane="telegrams" hidden>
         <section class="panel monitor-panel monitor-workspace">
           <div class="monitor-toolbar">
             <div class="monitor-action-row">
               <button id="monitor-toggle-button" class="primary" type="button">Monitor starten</button>
               <button id="clear-monitor-button" class="secondary" type="button">Anzeige leeren</button>
+              <button id="gm-telegrams-csv" class="secondary" type="button">Als CSV speichern</button>
             </div>
             <div class="monitor-filter-row">
               <label class="monitor-search">Gruppenadresse oder Bezeichnung
@@ -175,11 +261,66 @@
           <div class="monitor-summary"><strong id="monitor-visible-count">0</strong><span>angezeigt</span><i></i><strong id="monitor-total-count">0</strong><span>aufgezeichnet</span><small id="monitor-filter-note">Keine Filter aktiv</small></div>
           <div class="monitor-table-wrap"><table class="monitor-table"><thead><tr><th>Zeit</th><th>Von</th><th>Gruppenadresse / Bezeichnung</th><th>DPT</th><th>Dienst</th><th>Wert</th><th>Rohdaten</th></tr></thead><tbody id="monitor-body"><tr class="monitor-empty"><td colspan="7">KNX-Verbindung aufbauen und anschließend den Monitor starten.</td></tr></tbody></table></div>
         </section>
+        </section>
+
+        <section class="gm-pane" data-gm-pane="test" hidden>
+          <div class="gm-test-intro panel">
+            <div><h2>Funktionstest mit Rückmeldung</h2><p>Prüft, ob eine Funktion wirklich ausgeführt wird: Der Scanner schaltet z. B. ein Licht ein und wartet, bis der Aktor auf seiner <b>Status-Adresse</b> «Ein» zurückmeldet.</p></div>
+            <p class="gm-warning">⚠ Der Test schaltet echte Verbraucher (Licht, Storen, Heizung). Nur mit Sicht auf die Anlage oder in Absprache prüfen.</p>
+          </div>
+          <ol class="gm-steps">
+            <li><b>1 · Auswählen</b><span>Häkchen bei den Funktionen setzen, die du prüfen willst – einzeln oder ganze Gruppe. Vorschläge aus dem Projekt sind nicht vorausgewählt.</span></li>
+            <li><b>2 · Werte prüfen</b><span>In «Testwerte» steht, was gesendet wird, z. B. «ein; aus» oder «50; 0». Bei Bedarf anpassen.</span></li>
+            <li><b>3 · Starten</b><span>«Ausgewählte testen» oder «▶ Test» in einer Zeile. Oben rechts zuerst Senden freigeben.</span></li>
+            <li><b>4 · Ergebnis</b><span><b class="ok">✓</b> Rückmeldung passt · <b class="mismatch">≠</b> anderer Wert · <b class="no_reply">×</b> keine Rückmeldung. «Prüfprotokoll speichern» für die Dokumentation.</span></li>
+          </ol>
+          <div class="gm-toolbar">
+            <label>Wartezeit<select id="gm-test-timeout"><option value="2">2 s</option><option value="3" selected>3 s</option><option value="5">5 s</option><option value="10">10 s (Storen, Heizung)</option></select></label>
+            <label>Pause zwischen Werten<select id="gm-test-pause"><option value="0.5">0,5 s</option><option value="1" selected>1 s</option><option value="3">3 s</option></select></label>
+            <button id="gm-test-run" class="primary" type="button">▶ Ausgewählte testen</button>
+            <button id="gm-test-stop" class="secondary" type="button" disabled>■ Abbrechen</button>
+            <button id="gm-test-add" class="secondary" type="button">+ Test hinzufügen</button>
+            <button id="gm-test-protocol" class="secondary" type="button" disabled>Prüfprotokoll speichern</button>
+          </div>
+          <div class="gm-toolbar gm-test-filter">
+            <label class="gm-search">Suchen<input id="gm-test-search" type="search" placeholder="Name oder Gruppenadresse, z. B. Küche, 1/1" autocomplete="off" /></label>
+            <label>Gruppieren<select id="gm-test-grouping"><option value="middle">Haupt- und Mittelgruppe</option><option value="main">Hauptgruppe</option><option value="kind">Funktion</option></select></label>
+            <label>Anzeigen<select id="gm-test-show"><option value="all">Alle</option><option value="selected">Nur ausgewählte</option><option value="problems">Nur Fehler/Abweichungen</option><option value="open">Nur ungeprüfte</option></select></label>
+            <button id="gm-test-select-visible" class="secondary" type="button">Angezeigte auswählen</button>
+            <button id="gm-test-select-none" class="secondary" type="button">Auswahl aufheben</button>
+            <button id="gm-test-remove-selected" class="secondary" type="button">Ausgewählte entfernen</button>
+            <button id="gm-test-remove-all" class="secondary danger-text" type="button">Alle entfernen</button>
+          </div>
+          <div id="gm-test-summary" class="gm-test-summary"></div>
+          <div class="gm-test-wrap"><table class="gm-test-table"><colgroup><col class="c-check" /><col class="c-cmd" /><col class="c-status" /><col class="c-values" /><col class="c-result" /><col class="c-actions" /></colgroup><thead><tr><th></th><th>Was wird geschaltet (Befehl)</th><th>Wo kommt die Rückmeldung an (Status)</th><th>Testwerte (gesendet)</th><th>Ergebnis</th><th></th></tr></thead><tbody id="gm-test-body"><tr class="gm-test-empty"><td colspan="6">ETS-Projekt laden – bedienbare Befehls- und Status-Adressen werden automatisch zugeordnet (nichts ist vorausgewählt). Ohne Projekt: «+ Test hinzufügen».</td></tr></tbody></table></div>
+        </section>
+
+        <section class="gm-pane" data-gm-pane="rec" hidden>
+          <div class="gm-rec-grid">
+            <div class="panel gm-rec-panel">
+              <h2>Aufnehmen</h2>
+              <p>Zeichnet den Busverkehr mit Zeitstempeln auf – z. B. einen Tastendruck, eine Szene oder einen Fehler, der nur ab und zu auftritt.</p>
+              <div class="gm-rec-controls"><button id="gm-rec-toggle" class="gm-rec-button" type="button"><i></i><span>Aufnahme starten</span></button><div><strong id="gm-rec-time">00:00</strong><small id="gm-rec-count">0 Telegramme</small></div></div>
+              <div class="gm-rec-actions"><button id="gm-rec-load" class="secondary" type="button">Aufnahme laden …</button><input id="gm-rec-file" type="file" accept=".json,application/json" /></div>
+              <p id="gm-rec-message" class="message"></p>
+            </div>
+            <div class="panel gm-rec-panel">
+              <h2>Aufnahmen</h2>
+              <div id="gm-rec-list" class="gm-rec-list"><p class="gm-hint">Noch keine Aufnahme in dieser Sitzung.</p></div>
+            </div>
+          </div>
+          <div id="gm-player" class="panel gm-player" hidden>
+            <div class="gm-player-head"><div><h2 id="gm-player-title">Wiedergabe</h2><small id="gm-player-info"></small></div>
+              <div class="gm-player-buttons"><button id="gm-play" class="primary" type="button">▶ Abspielen</button><label>Tempo<select id="gm-play-speed"><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></label><button id="gm-play-bus" class="danger" type="button" title="Schreib-Telegramme der Aufnahme erneut auf den Bus senden">⚡ Auf den Bus senden</button></div></div>
+            <input id="gm-play-position" class="gm-play-position" type="range" min="0" max="1000" value="0" />
+            <div id="gm-play-log" class="gm-play-log"></div>
+          </div>
+        </section>
       </div>
 
       <div id="sco-view" class="app-view" hidden>
         <header class="monitor-page-header">
-          <div><p class="eyebrow">SCO-OBJEKT · 6 BYTE · SCO</p><h1>SCO-Test</h1><p class="page-lead">Sektoren gezielt ansteuern, Sicherheit setzen und aufheben sowie SCO-Telegramme mitschneiden und dekodieren.</p></div>
+          <div><p class="eyebrow">SCHRITT 5 · SCO-OBJEKT · 6 BYTE</p><h1>SCO-Test</h1><p class="page-lead">Sektoren gezielt ansteuern, Sicherheit setzen und aufheben sowie SCO-Telegramme mitschneiden und dekodieren.</p></div>
           <div class="header-actions"><span id="sco-connection-badge" class="badge muted">○ Nicht verbunden</span><span id="sco-monitor-badge" class="badge muted">○ Mitschnitt aus</span></div>
         </header>
         <div id="sco-lock-banner" class="sco-lock-banner" hidden></div>
@@ -270,6 +411,13 @@
           <div class="monitor-table-wrap"><table class="monitor-table"><thead><tr><th>GA</th><th>Ziel</th><th>Herkunft · Quellen</th><th>Anzahl</th><th>Befehle</th><th>Prioritäten</th><th>Zuletzt</th></tr></thead><tbody id="sco-sectors-body"><tr class="monitor-empty"><td colspan="7">Noch keine SCO-Telegramme.</td></tr></tbody></table></div>
         </section>
       </div>
+      <div id="building-view" class="app-view" hidden>
+        <header class="monitor-page-header">
+          <div><p class="eyebrow">SCHRITT 6 · GEBÄUDE</p><h1>Gebäudestruktur</h1><p class="page-lead">Gebäude, Etagen und Räume aus dem ETS-Projekt – Räume leuchten auf, wenn dort gerade Telegramme laufen.</p></div>
+          <div class="header-actions"><label class="gm-check"><input id="bd-live" type="checkbox" checked /> Live-Aktivität</label></div>
+        </header>
+        <div id="building-root" class="building-root"></div>
+      </div>
     </main>
     <dialog id="lock-reset-dialog" class="lock-reset-dialog">
       <form method="dialog" id="lock-reset-form">
@@ -301,7 +449,33 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/app.js?v=1.0.11"></script>
-    <script src="/static/sco.js?v=1.0.11"></script>
+    <dialog id="gm-control" class="gm-control">
+      <form method="dialog" class="gm-control-form">
+        <div class="gm-control-head"><span id="gm-control-visual" class="gm-control-visual"></span><div><small id="gm-control-address"></small><h2 id="gm-control-title">Gruppenadresse</h2><p id="gm-control-meta"></p></div><button class="gm-close" value="cancel" title="Schliessen">×</button></div>
+        <div id="gm-control-lock" class="gm-control-lock" hidden>Senden ist gesperrt. <button id="gm-control-unlock" type="button">Senden 30 Minuten freigeben</button></div>
+        <div id="gm-control-body" class="gm-control-body"></div>
+        <div class="gm-control-foot"><button id="gm-control-read" class="secondary" type="button">⟳ Wert lesen</button><button id="gm-control-test" class="secondary" type="button">✓ Als Funktionstest</button><span id="gm-control-message" class="message"></span></div>
+        <div class="gm-control-history"><small>Letzte Werte</small><div id="gm-control-history"></div></div>
+      </form>
+    </dialog>
+    <dialog id="gm-test-dialog" class="gm-control">
+      <form method="dialog" class="gm-control-form">
+        <div class="gm-control-head"><span class="gm-control-visual">✓</span><div><small>FUNKTIONSTEST</small><h2>Test hinzufügen</h2><p>Befehls-Adresse, zugehörige Status-Adresse und die zu sendenden Werte.</p></div><button class="gm-close" value="cancel" title="Schliessen">×</button></div>
+        <div class="gm-form-grid">
+          <label>Befehl (Gruppenadresse)<input id="gm-test-command" list="gm-ga-list" placeholder="z. B. 1/1/1" autocomplete="off" /></label>
+          <label>Rückmeldung (Status-GA)<input id="gm-test-status" list="gm-ga-list" placeholder="leer = gleiche Adresse" autocomplete="off" /></label>
+          <label>Datentyp (DPT)<input id="gm-test-dpt" list="gm-dpt-list" placeholder="aus Projekt, z. B. 1.001" autocomplete="off" /></label>
+          <label>Testwerte (mit ; getrennt)<input id="gm-test-values" placeholder="z. B. ein; aus  oder  50; 0" autocomplete="off" /></label>
+        </div>
+        <p id="gm-test-dialog-message" class="message"></p>
+        <div class="gm-control-foot"><button class="secondary" value="cancel">Abbrechen</button><button id="gm-test-dialog-add" class="primary" value="default">Hinzufügen</button></div>
+      </form>
+    </dialog>
+    <datalist id="gm-ga-list"></datalist>
+    <datalist id="gm-dpt-list"></datalist>
+    <script src="/static/app.js?v=1.1.0"></script>
+    <script src="/static/sco.js?v=1.1.0"></script>
+    <script src="/static/groupmonitor.js?v=1.1.0"></script>
+    <script src="/static/building.js?v=1.1.0"></script>
   </body>
 </html>

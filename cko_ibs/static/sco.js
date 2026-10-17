@@ -205,7 +205,7 @@ async function loadSCOAddresses() {
 
 // Warum Senden gerade nicht geht – deaktivierte Buttons allein reagieren nicht auf Klicks
 function scoSendBlocker() {
-  if (!busConnected) return "Senden gesperrt: keine KNX-Verbindung. Zuerst unter «Übersicht» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.";
+  if (!busConnected) return "Senden gesperrt: keine KNX-Verbindung. Zuerst in Schritt 2 «Verbindung» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.";
   if (!byId("sco-confirm")?.checked) return "Zum Senden «Vorschau geprüft» anhaken.";
   return "";
 }
@@ -230,7 +230,7 @@ function renderSCORequirement() {
   box.innerHTML = busConnected
     ? "<strong>● KNX verbunden</strong><span>Telegramme können gesendet und live mitgeschnitten werden. Ein ETS-Projekt ist dafür nicht nötig.</span>"
     : `<strong>○ Keine KNX-Verbindung</strong><span>Ohne ETS-Projekt nutzbar – <b>zum Senden und für den Live-Mitschnitt ist aber eine bestehende KNX-Verbindung nötig</b> (KNX/IP, IP Secure oder USB). Vorschau, Dekodierung und ETS-Import funktionieren auch offline.</span><button type="button" class="primary compact" id="sco-go-connect">Zur Verbindung</button>`;
-  byId("sco-go-connect")?.addEventListener("click", () => showView("overview"));
+  byId("sco-go-connect")?.addEventListener("click", () => showView("connection"));
 }
 
 function updateSCOBadges() {
@@ -357,7 +357,7 @@ function lockResetState() {
   send.disabled = !busConnected;
   if (!busConnected) {
     message.className = "message warn";
-    message.textContent = "Senden gesperrt: keine KNX-Verbindung. Zuerst unter «Übersicht» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.";
+    message.textContent = "Senden gesperrt: keine KNX-Verbindung. Zuerst in Schritt 2 «Verbindung» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.";
   } else if (message.classList.contains("warn")) {
     message.className = "message";
     message.textContent = "";

@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import re
+import time
 from collections import deque
 from contextlib import suppress
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from xknx import XKNX
@@ -15,10 +17,11 @@ from xknx.dpt import DPTArray, DPTBinary
 from xknx.exceptions import XKNXException
 from xknx.io import ConnectionConfig, ConnectionType, SecureConfig
 from xknx.management.procedures import nm_individual_address_check
+from xknx.secure.keyring import InterfaceType, Keyring, load_keyring
 from xknx.telegram import Telegram, apci
 from xknx.telegram.address import GroupAddress, IndividualAddress
 
-from cko_ibs import sco
+from cko_ibs import group_monitor, sco
 from cko_ibs.usb_connection import KNXUSBInterface, find_usb_device
 
 # Erkennt SCO-Objekte an ihrer Bezeichnung im ETS-Projekt (auch an der Herstellerbezeichnung)
@@ -86,6 +89,14 @@ class BusConnection:
         self._sco_addresses: set[str] = set()
         self.sco_log: deque[dict[str, Any]] = deque(maxlen=SCO_LOG_SIZE)
         self._lock = asyncio.Lock()
+        self._range_names: dict[str, str] = {}
+        self.group_state: dict[str, dict[str, Any]] = {}  # letzter Wert je Gruppenadresse
+        self._send_enabled_until = 0.0
+        # KNX Data Secure: Schlüsselbund (.knxkeys) nur im Arbeitsspeicher, gilt für jede Verbindungsart
+        self.data_secure_keyring: Keyring | None = None
+        self.data_secure_info: dict[str, Any] | None = None
+        self.undecoded_secure = 0
+        self._guessed_dpts: dict[str, str] = {}  # vermutete Datentypen für GAs ohne DPT
 
     @property
     def connected(self) -> bool:
@@ -116,6 +127,7 @@ class BusConnection:
                     route_back=route_back,
                     auto_reconnect=True,
                     individual_address=requested_address,
+                    secure_config=SecureConfig(keyring=self.data_secure_keyring) if self.data_secure_keyring else None,
                 )
                 candidate = XKNX(connection_config=config, telegram_received_cb=self._on_telegram)
                 try:
@@ -133,6 +145,7 @@ class BusConnection:
                 self.connection_mode = label
                 self.requested_individual_address = requested_address
                 self._apply_group_address_dpts()
+                self._activate_data_secure()
                 return self.status(
                     f"KNX/IP-Tunnel über {label} dauerhaft aufgebaut. Busmonitor ist aktiv."
                 )
@@ -167,6 +180,7 @@ class BusConnection:
             self.requested_individual_address = requested_address
             self.usb_device = device.to_dict()
             self._apply_group_address_dpts()
+            self._activate_data_secure()
         return self.status("Siemens OCI702 USB verbunden. Busmonitor ist aktiv.")
 
     async def disconnect(self) -> dict[str, Any]:
@@ -185,28 +199,30 @@ class BusConnection:
         user_id: int | None = None,
         user_password: str | None = None,
         device_authentication_password: str | None = None,
+        use_loaded_keyring: bool = False,
     ) -> dict[str, Any]:
         """Establish a KNX IP Secure tunnel over TCP."""
         gateway = str(ipaddress.ip_address(gateway_ip))
         local = str(ipaddress.ip_address(local_ip)) if local_ip else None
         requested_address = self._validate_individual_address(individual_address)
         if keyring_path:
-            if not keyring_password:
-                raise ValueError("Für die .knxkeys-Datei ist ein Passwort erforderlich.")
-            secure = SecureConfig(
-                knxkeys_file_path=keyring_path,
-                knxkeys_password=keyring_password,
-                user_id=user_id,
-            )
+            keyring = await self._read_keyring(keyring_path, keyring_password)
+            self._set_keyring(keyring, Path(keyring_path).name)
+            secure = SecureConfig(keyring=keyring, user_id=user_id)
+        elif use_loaded_keyring and self.data_secure_keyring is not None and not user_password:
+            # Schlüsselbund aus Schritt 1 «Projekt» – muss nicht nochmals ausgewählt werden
+            secure = SecureConfig(keyring=self.data_secure_keyring, user_id=user_id)
         elif user_id is not None and user_password:
             secure = SecureConfig(
                 user_id=user_id,
                 user_password=user_password,
                 device_authentication_password=device_authentication_password or None,
+                keyring=self.data_secure_keyring,  # Data Secure aus separat geladenem Schlüsselbund
             )
         else:
             raise ValueError(
-                "Bitte eine .knxkeys-Datei oder Benutzer-ID und Secure-Passwort angeben."
+                "Bitte in Schritt 1 den Schlüsselbund (.knxkeys) laden, hier eine .knxkeys-Datei wählen "
+                "oder Benutzer-ID und Secure-Passwort angeben."
             )
 
         async with self._lock:
@@ -234,6 +250,7 @@ class BusConnection:
             self.local_ip = local
             self.connection_mode = "TCP Secure"
             self.requested_individual_address = requested_address
+            self._activate_data_secure()
             self._apply_group_address_dpts()
         return self.status(
             "Gesicherter KNX/IP-Tunnel über TCP aufgebaut. Busmonitor ist aktiv."
@@ -416,12 +433,15 @@ class BusConnection:
             "requested_individual_address": self.requested_individual_address,
             "usb_device": self.usb_device,
             "address_warning": address_warning,
+            "data_secure": self.data_secure_status(),
             "message": message,
         }
 
-    def configure_group_addresses(self, rows: list[dict[str, str | None]]) -> None:
+    def configure_group_addresses(self, rows: list[dict[str, str | None]],
+                                  range_names: dict[str, str] | None = None) -> None:
         """Keep ETS group address metadata in local memory for monitor enrichment."""
         self._group_addresses = {str(row["address"]): row for row in rows}
+        self._range_names = dict(range_names or {})
         self._apply_group_address_dpts()
 
     def _apply_group_address_dpts(self) -> None:
@@ -502,7 +522,7 @@ class BusConnection:
     async def send_bit(self, group_address: str, value: bool, label: str = "") -> dict[str, Any]:
         """Einzelnes 1-Bit-Telegramm (GroupValueWrite) senden, z. B. um eine Automatiksperre zurückzusetzen."""
         if not self.connected or self.xknx is None:
-            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst unter «Übersicht» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.")
+            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst in Schritt 2 «Verbindung» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.")
         destination = GroupAddress(group_address)
         payload = apci.GroupValueWrite(DPTBinary(1 if value else 0))
         await self.xknx.telegrams.put(Telegram(destination_address=destination, payload=payload))
@@ -525,7 +545,7 @@ class BusConnection:
     async def send_sco(self, group_address: str, frames: list[bytes], label: str = "") -> list[dict[str, Any]]:
         """6-Byte-Telegramme nacheinander als GroupValueWrite senden und protokollieren."""
         if not self.connected or self.xknx is None:
-            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst unter «Übersicht» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.")
+            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst in Schritt 2 «Verbindung» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.")
         destination = GroupAddress(group_address)
         sent = []
         for index, frame in enumerate(frames):
@@ -554,6 +574,319 @@ class BusConnection:
                 await asyncio.sleep(0.25)  # Reihenfolge Fahrbefehl → Sperre auf dem Bus sicherstellen
         return sent
 
+    def reset_session(self, clear_keyring: bool = True) -> dict[str, Any]:
+        """Projektwechsel: alle Projekt- und Monitordaten vergessen, die KNX-Verbindung bleibt bestehen."""
+        self._group_addresses = {}
+        self._range_names = {}
+        self.group_state.clear()
+        self._guessed_dpts.clear()
+        self._sco_addresses.clear()
+        self.sco_log.clear()
+        self.undecoded_secure = 0
+        self._send_enabled_until = 0.0
+        self._apply_group_address_dpts()
+        if clear_keyring:
+            self.clear_data_secure()
+        return self.status("Zurückgesetzt – bereit für ein neues Projekt.")
+
+    # --- KNX Data Secure ------------------------------------------------------------
+
+    @staticmethod
+    async def _read_keyring(path: str, password: str | None) -> Keyring:
+        if not password:
+            raise ValueError("Für die .knxkeys-Datei ist ein Passwort erforderlich.")
+        try:
+            return await load_keyring(path, password)
+        except Exception as exc:
+            raise ValueError("Schlüsselbund konnte nicht geöffnet werden – Passwort der .knxkeys-Datei prüfen.") from exc
+
+    def _set_keyring(self, keyring: Keyring, filename: str) -> None:
+        keys = keyring.get_data_secure_group_keys()
+        interfaces = []
+        for interface in keyring.interfaces:
+            if interface.individual_address is None:
+                continue
+            secure_groups = [ga for ga in interface.group_addresses if ga in keys]
+            interfaces.append({
+                "individual_address": str(interface.individual_address),
+                "type": {InterfaceType.TUNNELING: "Tunnel", InterfaceType.USB: "USB",
+                         InterfaceType.BACKBONE: "Backbone"}.get(interface.type, str(interface.type)),
+                "user_id": interface.user_id,
+                "host": str(interface.host) if interface.host else None,
+                "secure_group_count": len(secure_groups),
+            })
+        self.data_secure_keyring = keyring
+        self.data_secure_info = {
+            "filename": filename,
+            "group_addresses": sorted((str(ga) for ga in keys), key=_ga_sort_key),
+            "group_address_count": len(keys),
+            "sender_count": len(keyring.get_data_secure_senders()),
+            "interfaces": sorted(interfaces, key=lambda item: -item["secure_group_count"])[:24],
+        }
+
+    async def load_data_secure(self, path: str, password: str | None, filename: str) -> dict[str, Any]:
+        """Schlüsselbund für KNX Data Secure laden; wirkt sofort auf eine bestehende Verbindung."""
+        keyring = await self._read_keyring(path, password)
+        self._set_keyring(keyring, filename)
+        self._activate_data_secure()
+        return self.data_secure_status()
+
+    def clear_data_secure(self) -> dict[str, Any]:
+        self.data_secure_keyring = None
+        self.data_secure_info = None
+        if self.xknx is not None and hasattr(self.xknx, "cemi_handler"):
+            self.xknx.cemi_handler.data_secure_init(keyring=None)
+        return self.data_secure_status()
+
+    def _activate_data_secure(self) -> None:
+        """Data Secure in der laufenden xknx-Instanz einschalten und unlesbare Secure-Telegramme melden."""
+        if self.xknx is None:
+            return
+        if self.data_secure_keyring is not None:
+            self.xknx.cemi_handler.data_secure_init(keyring=self.data_secure_keyring)
+        with suppress(AttributeError):
+            self.xknx.telegram_queue.register_data_secure_group_key_issue_cb(self._on_secure_key_issue)
+
+    def data_secure_status(self) -> dict[str, Any]:
+        info = self.data_secure_info or {}
+        current = str(self.xknx.current_address) if self.xknx is not None else None
+        interface = next((item for item in info.get("interfaces", []) if item["individual_address"] == current), None)
+        active = bool(self.xknx is not None and getattr(getattr(self.xknx, "cemi_handler", None), "data_secure", None) is not None)
+        return {
+            "loaded": self.data_secure_keyring is not None,
+            "active": active,
+            "filename": info.get("filename"),
+            "group_address_count": info.get("group_address_count", 0),
+            "interfaces": info.get("interfaces", []),
+            "current_address": current,
+            "current_interface": interface,
+            "can_send": bool(interface and interface["secure_group_count"]),
+            "undecoded": self.undecoded_secure,
+        }
+
+    def secure_groups(self) -> set[str]:
+        return set((self.data_secure_info or {}).get("group_addresses", []))
+
+    def _on_secure_key_issue(self, telegram: Telegram) -> None:
+        """Verschlüsseltes Gruppentelegramm ohne passenden Schlüssel – trotzdem im Monitor zeigen."""
+        self.undecoded_secure += 1
+        destination = str(telegram.destination_address)
+        row = self._group_addresses.get(destination, {})
+        self._publish({
+            "time": datetime.now().astimezone().isoformat(timespec="milliseconds"),
+            "direction": telegram.direction.value,
+            "source": str(telegram.source_address),
+            "destination": destination,
+            "group_name": row.get("name"),
+            "dpt": row.get("dpt"),
+            "service": "DataSecure",
+            "value": "🔒 verschlüsselt – Schlüssel fehlt",
+            "value_json": None,
+            "unit": None,
+            "hex": "",
+            "small": False,
+            "raw": "",
+            "secure": True,
+            "undecoded": True,
+        })
+
+    # --- Gruppenmonitor: Werte, Senden, Funktionstest -------------------------------
+
+    def _remember(self, item: dict[str, Any]) -> None:
+        if item.get("service") in {"GroupValueWrite", "GroupValueResponse"}:
+            self.group_state[item["destination"]] = {key: item.get(key) for key in (
+                "time", "source", "service", "value", "value_json", "unit", "hex", "dpt", "direction", "small",
+                "dpt_guessed")}
+
+    def group_rows(self) -> list[dict[str, Any]]:
+        rows = [row for _address, row in sorted(self._group_addresses.items(), key=lambda item: _ga_sort_key(item[0]))]
+        secure = self.secure_groups()
+        return [dict(row) | {"info": group_monitor.describe(row.get("dpt")), "secure": str(row.get("address")) in secure}
+                for row in rows]
+
+    @property
+    def range_names(self) -> dict[str, str]:
+        return dict(self._range_names)
+
+    def status_pairs(self) -> list[dict[str, Any]]:
+        return group_monitor.status_pairs(list(self._group_addresses.values()), self._range_names)
+
+    def set_dpt(self, group_address: str, dpt: str | None) -> dict[str, Any]:
+        """Datentyp für eine GA festlegen (z. B. ohne ETS-Projekt); gilt ab dem nächsten Telegramm."""
+        address = group_monitor.parse_group_address(group_address)
+        if dpt and group_monitor.transcoder_for(dpt) is None:
+            raise group_monitor.MonitorError(f"Unbekannter Datentyp «{dpt}».")
+        row = dict(self._group_addresses.get(address) or {"address": address, "name": None, "size": None})
+        row["dpt"] = dpt or None
+        self._group_addresses[address] = row
+        self._guessed_dpts.pop(address, None)
+        self._apply_group_address_dpts()
+        state = self.group_state.get(address)
+        if state and state.get("hex") and dpt:
+            # Letzten Wert sofort mit dem neuen Datentyp lesen, nicht erst beim nächsten Telegramm
+            data = bytes.fromhex(state["hex"].replace(" ", ""))
+            payload_value = DPTBinary(data[0]) if state.get("small") and len(data) == 1 else DPTArray(tuple(data))
+            value = group_monitor.decode(dpt, payload_value)
+            state.update({"dpt": dpt, "value_json": value, "dpt_guessed": False,
+                          "unit": group_monitor.describe(dpt)["unit"],
+                          "value": None if value is None else group_monitor.value_text(value, group_monitor.describe(dpt)["unit"])})
+        return row | {"state": state}
+
+    def send_mode(self) -> dict[str, Any]:
+        remaining = max(0, round(self._send_enabled_until - time.monotonic()))
+        return {"enabled": remaining > 0, "remaining_s": remaining}
+
+    def set_send_mode(self, enabled: bool) -> dict[str, Any]:
+        self._send_enabled_until = time.monotonic() + group_monitor.SEND_MODE_SECONDS if enabled else 0.0
+        return self.send_mode()
+
+    def _require_sending(self) -> None:
+        if not self.connected or self.xknx is None:
+            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst in Schritt 2 «Verbindung» mit der KNX-Schnittstelle verbinden.")
+        if not self.send_mode()["enabled"]:
+            raise PermissionError("Senden ist gesperrt. Oben «Nur beobachten» anklicken und Senden für 30 Minuten freigeben.")
+
+    def _outgoing_item(self, destination: str, service: str, label: str, dpt: Any = None,
+                       value: Any = None, hex_value: str = "") -> dict[str, Any]:
+        row = self._group_addresses.get(destination, {})
+        dpt = dpt or row.get("dpt")
+        return {
+            "time": datetime.now().astimezone().isoformat(timespec="milliseconds"),
+            "direction": "Outgoing",
+            "source": str(self.xknx.current_address) if self.xknx is not None else "",
+            "destination": destination,
+            "group_name": row.get("name"),
+            "dpt": dpt,
+            "service": service,
+            "value": None if value is None else str(value),
+            "value_json": group_monitor.json_value(value),
+            "unit": group_monitor.describe(dpt).get("unit"),
+            "hex": hex_value,
+            "raw": "",
+            "secure": False,
+            "origin": f"IBS-Monitor{': ' + label if label else ''}",
+        }
+
+    async def send_value(self, group_address: str, dpt: Any = None, value: Any = None, raw_hex: str | None = None,
+                         raw_small: bool = False, label: str = "") -> dict[str, Any]:
+        """GroupValueWrite mit beliebigem Datentyp senden (oder als Rohwert)."""
+        self._require_sending()
+        destination = group_monitor.parse_group_address(group_address)
+        dpt = dpt or self._group_addresses.get(destination, {}).get("dpt")
+        payload_value, shown = group_monitor.encode(dpt, value, raw_hex, raw_small)
+        decoded = group_monitor.decode(dpt, payload_value) if not raw_hex else None
+        await self.xknx.telegrams.put(Telegram(destination_address=GroupAddress(destination),
+                                               payload=apci.GroupValueWrite(payload_value)))
+        item = self._outgoing_item(destination, "GroupValueWrite", label, dpt,
+                                   decoded if decoded is not None else shown, group_monitor.payload_hex(payload_value))
+        item["small"] = isinstance(payload_value, DPTBinary)
+        item["secure"] = destination in self.secure_groups()
+        if item["secure"]:
+            item["secure_warning"] = self._secure_send_warning(destination)
+        self._remember(item)
+        self._publish(item)
+        return item
+
+    def _secure_send_warning(self, destination: str) -> str | None:
+        """Data-Secure-Geräte nehmen nur Telegramme von Absendern an, die in der ETS eingetragen sind."""
+        status = self.data_secure_status()
+        interface = status["current_interface"]
+        keyring = self.data_secure_keyring
+        if keyring is None:
+            return None
+        ia = self.xknx.current_address if self.xknx is not None else None
+        allowed = ia is not None and any(
+            ia in senders for ga, senders in self._keyring_group_senders(keyring).items() if str(ga) == destination)
+        if allowed or (interface and interface["secure_group_count"]):
+            return None
+        return (f"Gesendet mit Quelladresse {status['current_address']}. Data-Secure-Geräte übernehmen den Wert nur, wenn diese "
+                "Adresse in der ETS als Sender eingetragen ist – sonst eine Tunneladresse aus dem Schlüsselbund verwenden.")
+
+    @staticmethod
+    def _keyring_group_senders(keyring: Keyring) -> dict[Any, list[Any]]:
+        senders: dict[Any, list[Any]] = {}
+        for interface in keyring.interfaces:
+            for ga, ias in interface.group_addresses.items():
+                senders.setdefault(ga, []).extend(ias)
+                if interface.individual_address is not None:
+                    senders[ga].append(interface.individual_address)
+        return senders
+
+    async def send_read(self, group_address: str, label: str = "") -> dict[str, Any]:
+        """GroupValueRead senden; die Antwort erscheint als GroupValueResponse im Monitor."""
+        self._require_sending()
+        destination = group_monitor.parse_group_address(group_address)
+        await self.xknx.telegrams.put(Telegram(destination_address=GroupAddress(destination),
+                                               payload=apci.GroupValueRead()))
+        item = self._outgoing_item(destination, "GroupValueRead", label)
+        self._publish(item)
+        return item
+
+    async def function_test(self, command: str, value: Any, status: str | None = None, dpt: Any = None,
+                            timeout: float = 3.0, read_fallback: bool = True) -> dict[str, Any]:
+        """Befehl senden und auf die Rückmeldung der Status-GA warten (bei Bedarf einmal nachlesen)."""
+        command = group_monitor.parse_group_address(command)
+        status = group_monitor.parse_group_address(status) if status else command
+        timeout = min(max(float(timeout), 0.5), 15.0)
+        queue = self.subscribe()
+        started = time.monotonic()
+        try:
+            sent = await self.send_value(command, dpt, value, label="Funktionstest")
+            status_dpt = self._group_addresses.get(status, {}).get("dpt")
+            compare = status != command and group_monitor.same_kind(
+                dpt or self._group_addresses.get(command, {}).get("dpt"), status_dpt)
+
+            def matches(item: dict[str, Any]) -> bool:
+                return not compare or item.get("value_json") is None or group_monitor.values_match(
+                    sent.get("value_json"), item.get("value_json"), status_dpt or dpt)
+
+            # Bis zur Wartezeit auf den passenden Wert warten – Storen und Dimmer melden Zwischenwerte
+            reply, deadline = None, time.monotonic() + timeout
+            while (remaining := deadline - time.monotonic()) > 0:
+                item = await self._wait_for(queue, status, remaining)
+                if item is None:
+                    break
+                reply = item
+                if matches(item):
+                    break
+            read_used = False
+            if reply is None and read_fallback:
+                read_used = True
+                await self.send_read(status, label="Funktionstest – Status lesen")
+                reply = await self._wait_for(queue, status, min(timeout, 3.0))
+        finally:
+            self.unsubscribe(queue)
+        result = {
+            "command": command, "status": status, "sent": sent.get("value_json"),
+            "received": reply.get("value_json") if reply else None,
+            "received_text": reply.get("value") if reply else None,
+            "source": reply.get("source") if reply else None,
+            "latency_ms": round((time.monotonic() - started) * 1000) if reply else None,
+            "read_used": read_used,
+        }
+        if reply is None:
+            result["result"] = "no_reply"
+            result["message"] = "Keine Rückmeldung – Status-GA, Verknüpfung im Aktor oder Busverbindung prüfen."
+        elif matches(reply):
+            result["result"] = "ok"
+            result["message"] = "Rückmeldung erhalten" + (" (nach Lesen)" if read_used else "")
+        else:
+            result["result"] = "mismatch"
+            result["message"] = "Rückmeldung weicht vom gesendeten Wert ab."
+        return result
+
+    async def _wait_for(self, queue: asyncio.Queue[dict[str, Any]], address: str, timeout: float) -> dict[str, Any] | None:
+        deadline = time.monotonic() + timeout
+        while (remaining := deadline - time.monotonic()) > 0:
+            try:
+                item = await asyncio.wait_for(queue.get(), remaining)
+            except TimeoutError:
+                return None
+            if (item.get("destination") == address and item.get("direction") != "Outgoing"
+                    and item.get("service") in {"GroupValueWrite", "GroupValueResponse"}):
+                return item
+        return None
+
     def subscribe(self) -> asyncio.Queue[dict[str, Any]]:
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=250)
         self._subscribers.add(queue)
@@ -569,20 +902,39 @@ class BusConnection:
         group_address = self._group_addresses.get(destination, {})
         if telegram.decoded_data is not None and isinstance(telegram.decoded_data.value, bool):
             decoded = "1 · Ein/True" if telegram.decoded_data.value else "0 · Aus/False"
+        transcoder = telegram.decoded_data.transcoder if telegram.decoded_data is not None else None
+        guessed = None
+        if not group_address.get("dpt") and transcoder is None and payload is not None:
+            guessed = self._guessed_dpts.get(destination) or group_monitor.guess_dpt(
+                group_address.get("name"), getattr(payload, "value", None))
+            if guessed:
+                self._guessed_dpts[destination] = guessed
+        dpt = group_address.get("dpt") or guessed or (
+            f"{transcoder.dpt_main_number}.{transcoder.dpt_sub_number:03d}"
+            if transcoder is not None and getattr(transcoder, "dpt_sub_number", None) is not None else None)
         item = {
             "time": datetime.now().astimezone().isoformat(timespec="milliseconds"),
             "direction": telegram.direction.value,
             "source": str(telegram.source_address),
             "destination": destination,
             "group_name": group_address.get("name"),
-            "dpt": group_address.get("dpt"),
+            "dpt": dpt,
             "service": type(payload).__name__ if payload is not None else type(telegram.tpci).__name__,
             "value": decoded,
+            "value_json": group_monitor.json_value(telegram.decoded_data.value) if telegram.decoded_data
+            else group_monitor.decode(dpt, getattr(payload, "value", None)),
+            "unit": getattr(transcoder, "unit", None) if transcoder is not None else group_monitor.describe(dpt)["unit"],
+            "hex": group_monitor.payload_hex(getattr(payload, "value", None)),
+            "small": isinstance(getattr(payload, "value", None), DPTBinary),
             "raw": str(payload) if payload is not None else "",
             "secure": telegram.data_secure is True,
+            "dpt_guessed": bool(guessed),
         }
+        if item["value"] is None and item["value_json"] is not None:
+            item["value"] = group_monitor.value_text(item["value_json"], item["unit"])
         with suppress(sco.SCOError):
             self._attach_sco(item, payload)
+        self._remember(item)
         self._publish(item)
 
 

@@ -12,3 +12,6 @@ build/
 *.knxkeys
 data/
 frontend/node_modules/
+
+# Öffentliche Beispiel-Schlüsselbunde aus xknx (MIT) für Tests
+!tests/resources/*.knxkeys
