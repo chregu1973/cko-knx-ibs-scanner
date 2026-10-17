@@ -96,6 +96,7 @@ class BusConnection:
         self.data_secure_keyring: Keyring | None = None
         self.data_secure_info: dict[str, Any] | None = None
         self.undecoded_secure = 0
+        self._guessed_dpts: dict[str, str] = {}  # vermutete Datentypen für GAs ohne DPT
 
     @property
     def connected(self) -> bool:
@@ -198,6 +199,7 @@ class BusConnection:
         user_id: int | None = None,
         user_password: str | None = None,
         device_authentication_password: str | None = None,
+        use_loaded_keyring: bool = False,
     ) -> dict[str, Any]:
         """Establish a KNX IP Secure tunnel over TCP."""
         gateway = str(ipaddress.ip_address(gateway_ip))
@@ -207,6 +209,9 @@ class BusConnection:
             keyring = await self._read_keyring(keyring_path, keyring_password)
             self._set_keyring(keyring, Path(keyring_path).name)
             secure = SecureConfig(keyring=keyring, user_id=user_id)
+        elif use_loaded_keyring and self.data_secure_keyring is not None and not user_password:
+            # Schlüsselbund aus Schritt 1 «Projekt» – muss nicht nochmals ausgewählt werden
+            secure = SecureConfig(keyring=self.data_secure_keyring, user_id=user_id)
         elif user_id is not None and user_password:
             secure = SecureConfig(
                 user_id=user_id,
@@ -216,7 +221,8 @@ class BusConnection:
             )
         else:
             raise ValueError(
-                "Bitte eine .knxkeys-Datei oder Benutzer-ID und Secure-Passwort angeben."
+                "Bitte in Schritt 1 den Schlüsselbund (.knxkeys) laden, hier eine .knxkeys-Datei wählen "
+                "oder Benutzer-ID und Secure-Passwort angeben."
             )
 
         async with self._lock:
@@ -516,7 +522,7 @@ class BusConnection:
     async def send_bit(self, group_address: str, value: bool, label: str = "") -> dict[str, Any]:
         """Einzelnes 1-Bit-Telegramm (GroupValueWrite) senden, z. B. um eine Automatiksperre zurückzusetzen."""
         if not self.connected or self.xknx is None:
-            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst unter «Übersicht» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.")
+            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst in Schritt 2 «Verbindung» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.")
         destination = GroupAddress(group_address)
         payload = apci.GroupValueWrite(DPTBinary(1 if value else 0))
         await self.xknx.telegrams.put(Telegram(destination_address=destination, payload=payload))
@@ -539,7 +545,7 @@ class BusConnection:
     async def send_sco(self, group_address: str, frames: list[bytes], label: str = "") -> list[dict[str, Any]]:
         """6-Byte-Telegramme nacheinander als GroupValueWrite senden und protokollieren."""
         if not self.connected or self.xknx is None:
-            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst unter «Übersicht» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.")
+            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst in Schritt 2 «Verbindung» mit der KNX-Schnittstelle verbinden – ein ETS-Projekt ist nicht nötig.")
         destination = GroupAddress(group_address)
         sent = []
         for index, frame in enumerate(frames):
@@ -567,6 +573,21 @@ class BusConnection:
             if index < len(frames)-1:
                 await asyncio.sleep(0.25)  # Reihenfolge Fahrbefehl → Sperre auf dem Bus sicherstellen
         return sent
+
+    def reset_session(self, clear_keyring: bool = True) -> dict[str, Any]:
+        """Projektwechsel: alle Projekt- und Monitordaten vergessen, die KNX-Verbindung bleibt bestehen."""
+        self._group_addresses = {}
+        self._range_names = {}
+        self.group_state.clear()
+        self._guessed_dpts.clear()
+        self._sco_addresses.clear()
+        self.sco_log.clear()
+        self.undecoded_secure = 0
+        self._send_enabled_until = 0.0
+        self._apply_group_address_dpts()
+        if clear_keyring:
+            self.clear_data_secure()
+        return self.status("Zurückgesetzt – bereit für ein neues Projekt.")
 
     # --- KNX Data Secure ------------------------------------------------------------
 
@@ -613,7 +634,7 @@ class BusConnection:
     def clear_data_secure(self) -> dict[str, Any]:
         self.data_secure_keyring = None
         self.data_secure_info = None
-        if self.xknx is not None:
+        if self.xknx is not None and hasattr(self.xknx, "cemi_handler"):
             self.xknx.cemi_handler.data_secure_init(keyring=None)
         return self.data_secure_status()
 
@@ -630,7 +651,7 @@ class BusConnection:
         info = self.data_secure_info or {}
         current = str(self.xknx.current_address) if self.xknx is not None else None
         interface = next((item for item in info.get("interfaces", []) if item["individual_address"] == current), None)
-        active = bool(self.xknx is not None and getattr(self.xknx.cemi_handler, "data_secure", None) is not None)
+        active = bool(self.xknx is not None and getattr(getattr(self.xknx, "cemi_handler", None), "data_secure", None) is not None)
         return {
             "loaded": self.data_secure_keyring is not None,
             "active": active,
@@ -674,7 +695,8 @@ class BusConnection:
     def _remember(self, item: dict[str, Any]) -> None:
         if item.get("service") in {"GroupValueWrite", "GroupValueResponse"}:
             self.group_state[item["destination"]] = {key: item.get(key) for key in (
-                "time", "source", "service", "value", "value_json", "unit", "hex", "dpt", "direction")}
+                "time", "source", "service", "value", "value_json", "unit", "hex", "dpt", "direction", "small",
+                "dpt_guessed")}
 
     def group_rows(self) -> list[dict[str, Any]]:
         rows = [row for _address, row in sorted(self._group_addresses.items(), key=lambda item: _ga_sort_key(item[0]))]
@@ -697,8 +719,18 @@ class BusConnection:
         row = dict(self._group_addresses.get(address) or {"address": address, "name": None, "size": None})
         row["dpt"] = dpt or None
         self._group_addresses[address] = row
+        self._guessed_dpts.pop(address, None)
         self._apply_group_address_dpts()
-        return row
+        state = self.group_state.get(address)
+        if state and state.get("hex") and dpt:
+            # Letzten Wert sofort mit dem neuen Datentyp lesen, nicht erst beim nächsten Telegramm
+            data = bytes.fromhex(state["hex"].replace(" ", ""))
+            payload_value = DPTBinary(data[0]) if state.get("small") and len(data) == 1 else DPTArray(tuple(data))
+            value = group_monitor.decode(dpt, payload_value)
+            state.update({"dpt": dpt, "value_json": value, "dpt_guessed": False,
+                          "unit": group_monitor.describe(dpt)["unit"],
+                          "value": None if value is None else group_monitor.value_text(value, group_monitor.describe(dpt)["unit"])})
+        return row | {"state": state}
 
     def send_mode(self) -> dict[str, Any]:
         remaining = max(0, round(self._send_enabled_until - time.monotonic()))
@@ -710,7 +742,7 @@ class BusConnection:
 
     def _require_sending(self) -> None:
         if not self.connected or self.xknx is None:
-            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst unter «Übersicht» mit der KNX-Schnittstelle verbinden.")
+            raise RuntimeError("Keine aktive KNX-Verbindung. Zuerst in Schritt 2 «Verbindung» mit der KNX-Schnittstelle verbinden.")
         if not self.send_mode()["enabled"]:
             raise PermissionError("Senden ist gesperrt. Oben «Nur beobachten» anklicken und Senden für 30 Minuten freigeben.")
 
@@ -871,7 +903,13 @@ class BusConnection:
         if telegram.decoded_data is not None and isinstance(telegram.decoded_data.value, bool):
             decoded = "1 · Ein/True" if telegram.decoded_data.value else "0 · Aus/False"
         transcoder = telegram.decoded_data.transcoder if telegram.decoded_data is not None else None
-        dpt = group_address.get("dpt") or (
+        guessed = None
+        if not group_address.get("dpt") and transcoder is None and payload is not None:
+            guessed = self._guessed_dpts.get(destination) or group_monitor.guess_dpt(
+                group_address.get("name"), getattr(payload, "value", None))
+            if guessed:
+                self._guessed_dpts[destination] = guessed
+        dpt = group_address.get("dpt") or guessed or (
             f"{transcoder.dpt_main_number}.{transcoder.dpt_sub_number:03d}"
             if transcoder is not None and getattr(transcoder, "dpt_sub_number", None) is not None else None)
         item = {
@@ -890,6 +928,7 @@ class BusConnection:
             "small": isinstance(getattr(payload, "value", None), DPTBinary),
             "raw": str(payload) if payload is not None else "",
             "secure": telegram.data_secure is True,
+            "dpt_guessed": bool(guessed),
         }
         if item["value"] is None and item["value_json"] is not None:
             item["value"] = group_monitor.value_text(item["value_json"], item["unit"])

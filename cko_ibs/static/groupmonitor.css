@@ -216,3 +216,70 @@ dialog.gm-control{width:min(620px,calc(100vw - 30px))}
 .gm-header .header-actions>*{white-space:nowrap}
 .gm-secure-hint{margin:0 0 10px;padding:10px 13px;border-radius:9px;border:1px solid #286b83;background:#0c1f29;color:#8ddcf4;font-size:13px}
 .gm-tile.locked .gm-value{color:#8ddcf4;font-size:13px}
+
+/* Seitenaufbau in Schritten */
+.nav-item b{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1px solid #3b4b60;font-size:11px;color:#8f9caf;flex:0 0 22px}
+.nav-item.active b{border-color:#ed3948;color:#fff;background:#ed3948}
+.session-reset{border:1px solid #3b4b60;background:#0c141f;color:#dce4ee;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.session-reset:hover{border-color:#ed3948;color:#fff}
+.step-hint{margin:0 0 16px;padding:13px 16px;border-radius:11px;border:1px solid #235b8c;background:#102235;color:#cfe6ff;font-size:14px;line-height:1.5}
+.step-hint strong{color:#fff}
+.step-footer{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin:18px 0 6px;padding:14px 18px;border:1px solid #263346;border-radius:12px;background:#0c141f}
+.step-footer .muted{color:#8f9caf;font-size:13px}
+.good-text{color:#70e5ae;font-size:13px;font-weight:600}
+.link-button{border:0;background:none;color:#7fc2ff;font:inherit;font-weight:700;cursor:pointer;padding:0;text-decoration:underline}
+.panel-intro{color:#8f9caf;font-size:13px;line-height:1.55;margin:0 0 12px}
+.project-grid{grid-template-columns:1fr 1fr}
+
+
+/* Schnellbedienung (in jeder Ansicht) */
+.quickbar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:-34px -40px 22px;padding:10px 40px;background:rgba(11,17,25,.94);backdrop-filter:blur(8px);border-bottom:1px solid #263346}
+.qb-title{font-weight:800;color:#ffc46b;font-size:13px;white-space:nowrap}
+.qb-ga{display:flex;flex-direction:column;gap:2px;min-width:230px;flex:0 1 300px}
+.qb-ga small{color:#8f9caf;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.quickbar input{padding:8px 10px;background:#0c141f;color:#fff;border:1px solid #263346;border-radius:8px;font-size:13px}
+.qb-dpt{width:96px}
+.qb-value{width:190px}
+.quickbar button{padding:8px 13px}
+.qb-result{flex:1 1 220px;font-size:12px;color:#8f9caf;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qb-result.ok{color:#70e5ae}.qb-result.warn{color:#ffc46b}.qb-result.error{color:#ff7a85}
+.qb-recent{display:flex;gap:5px;flex-wrap:wrap;flex-basis:100%;margin-left:64px}
+.qb-recent:empty{display:none}
+.qb-recent button{padding:2px 8px!important;border:1px solid #263346;border-radius:12px;background:#0c141f;color:#8fbfe8;font-size:11px;cursor:pointer}
+
+/* Erklärungen für Einsteiger */
+.gm-tab-help{margin:-4px 0 12px;color:#8f9caf;font-size:13px}
+.gm-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;list-style:none;padding:0;margin:0 0 14px}
+.gm-steps li{padding:11px 13px;border:1px solid #263346;border-radius:10px;background:#0c141f;display:grid;gap:4px}
+.gm-steps li b{color:#fff;font-size:13px}
+.gm-steps li span{color:#8f9caf;font-size:12px;line-height:1.45}
+.gm-steps .ok{color:#70e5ae}.gm-steps .mismatch{color:#ffc46b}.gm-steps .no_reply{color:#ff7a85}
+
+/* Funktionstest-Tabelle: passt in die Breite, Entfernen immer sichtbar */
+.gm-test-wrap{border:1px solid #263346;border-radius:12px;overflow:hidden;background:#0c141f}
+.gm-test-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px}
+.gm-test-table col.c-check{width:42px}.gm-test-table col.c-cmd{width:27%}.gm-test-table col.c-status{width:27%}
+.gm-test-table col.c-values{width:14%}.gm-test-table col.c-result{width:auto}.gm-test-table col.c-actions{width:170px}
+.gm-test-table th{text-align:left;padding:10px;color:#8f9caf;font-size:11px;font-weight:700;border-bottom:1px solid #263346;background:#101a27}
+.gm-test-table td{padding:9px 10px;border-bottom:1px solid #1c2738;vertical-align:top;overflow-wrap:anywhere}
+.gm-test-table td small{display:block;color:#8f9caf;font-size:11px;line-height:1.35}
+.gm-test-table .gm-reason{color:#6f8aa8;font-style:italic}
+.gm-test-group td{background:#111c2b;border-bottom:1px solid #263346}
+.gm-test-group-toggle{border:0;background:none;color:#fff;font-weight:800;font-size:13px;cursor:pointer;padding:0}
+.gm-test-group small{display:inline!important;margin-left:8px}
+.gm-test-row.problem td:first-child{box-shadow:inset 3px 0 #ed3948}
+.gm-test-row.ok td:first-child{box-shadow:inset 3px 0 #37cc8a}
+.gm-test-row .gm-test-values{width:100%}
+.gm-test-actions{display:flex;gap:6px;flex-wrap:wrap}
+.gm-test-remove{border:1px solid #7a2530;background:#2a1117;color:#ff9aa4;border-radius:6px;padding:5px 9px;font-size:12px;cursor:pointer;margin:0}
+.gm-test-remove:hover{background:#4a1722;color:#fff}
+.gm-test-empty td{padding:26px;text-align:center;color:#8f9caf}
+.gm-test-filter .gm-search{flex:1 1 240px}
+.danger-text{color:#ff9aa4!important;border-color:#7a2530!important}
+.gm-dpt-change{margin-top:4px;padding:10px 12px;border:1px solid #263346;border-radius:9px;background:#0c141f}
+.gm-dpt-change[open] summary{margin-bottom:8px}
+.gm-dpt-change summary b{color:#fff}
+@media(max-width:1300px){.gm-steps{grid-template-columns:1fr 1fr}.project-grid{grid-template-columns:1fr}}
+@media(max-width:1050px){.quickbar{margin:-25px -25px 18px;padding:10px 25px}.qb-recent{margin-left:0}}
+.connection-grid{grid-template-columns:1fr}
+.ds-status[hidden]{display:none!important}

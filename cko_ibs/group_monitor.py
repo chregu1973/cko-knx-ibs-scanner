@@ -23,6 +23,12 @@ STATUS_WORDS = {"status", "rueckmeldung", "rm", "feedback", "zustand", "ist", "i
 FUNCTION_WORDS = {"schalten", "ein", "aus", "einaus", "dimmen", "dimmwert", "wert", "helligkeit", "helligkeitswert",
                   "position", "fahren", "auf", "ab", "aufab", "stopp", "stop", "lamelle", "lamellen", "absolut",
                   "relativ", "switch", "dim", "value", "brightness", "move", "objekt", "ga"}
+# Reine Melder: nie als «Befehl» für den Funktionstest vorschlagen (Kontakte, Sensoren, Alarme, Messwerte)
+SENSOR_WORDS = re.compile(r"kontakt|melder|sensor|alarm|praesenz|bewegung|wetter|wind|regen|stoerung|fehler|"
+                          r"messwert|istwert|aussentemp|zaehler|verbrauch|leistung|energie|lux|co2|feuchte")
+# Datentypen, die bedient werden (Schalten, Dimmen, Storen, Szenen, Betriebsart, Farbe, Sollwerte)
+CONTROL_MAINS = {1, 3, 5, 9, 17, 18, 20, 232, 251}
+SENSOR_DPTS = {"1.019", "1.005", "1.006", "1.020"}  # Fenster/Tür, Alarm, Binärwert, Logik-Status
 # Welche Datentypen als Rückmeldung zu einem Befehl passen (Hauptnummer Befehl → Hauptnummern Status)
 COMPATIBLE_STATUS = {1: {1, 5}, 3: {5}, 5: {5}, 9: {9}, 14: {14}, 7: {7}, 8: {8}, 12: {12}, 13: {13},
                      17: {17}, 18: {17, 18}, 20: {20}, 232: {232}, 251: {251}}
@@ -149,6 +155,35 @@ def encode(dpt: Any, value: Any, raw_hex: str | None = None,
         raise MonitorError(f"Wert «{value}» passt nicht zu DPT {dpt}: {exc}") from exc
 
 
+# Datentyp erraten, wenn weder Gruppenadresse noch Kommunikationsobjekt einen haben (wie die ETS über die Länge)
+_GUESS_BY_NAME = {
+    1: [(r"winkel|lamelle", "5.003"), (r"szene", "17.001"), (r"betriebsart|modus|hvac", "20.102"),
+        (r"%|prozent|helligkeit|position|stellwert|dimm|wert", "5.001")],
+    2: [(r"lux|helligkeit|lichtwert|daemmerung|dammerung", "9.004"), (r"°c|grad|temp", "9.001"),
+        (r"km/h|kmh", "9.028"), (r"m/s|wind", "9.005"), (r"%|feuchte", "9.007"), (r"ppm|co2|co₂|luftqual", "9.008"),
+        (r"\bkw\b", "9.024"), (r"\bpa\b|druck", "9.006")],
+    3: [(r"zeit|uhr", "10.001"), (r"datum", "11.001"), (r"rgb|farbe", "232.600")],
+    4: [(r"kwh", "13.013"), (r"\bwh\b", "13.010"), (r"zaehler|zähler|counter|impuls", "13.001"),
+        (r"\bw\b|leistung|watt", "14.056"), (r"\bv\b|spannung", "14.027"), (r"\ba\b|strom", "14.019")],
+    14: [(r".", "16.001")],
+}
+_GUESS_BY_LENGTH = {1: "5.010", 2: "9", 4: "14"}
+
+
+def guess_dpt(name: Any, payload_value: Any) -> str | None:
+    """DPT anhand von Name/Einheit und Telegrammlänge vermuten (nur Anzeige, als «vermutet» gekennzeichnet)."""
+    if isinstance(payload_value, DPTBinary):
+        return "1.001"
+    if not isinstance(payload_value, DPTArray):
+        return None
+    length = len(payload_value.value)
+    text = " ".join(_words(str(name or ""))) + " " + str(name or "").lower()
+    for pattern, dpt in _GUESS_BY_NAME.get(length, []):
+        if re.search(pattern, text):
+            return dpt
+    return _GUESS_BY_LENGTH.get(length)
+
+
 def value_text(value: Any, unit: str | None = None) -> str:
     """Kurztext für die Telegrammliste, wenn xknx selbst nichts dekodiert hat."""
     if isinstance(value, bool):
@@ -196,6 +231,20 @@ def _parts(address: str) -> tuple[str, ...]:
     return tuple(str(address).split("/"))
 
 
+def _is_command(entry: dict[str, Any]) -> bool:
+    """Nur bedienbare Funktionen kommen als Befehl in Frage – Melder und Messwerte nicht."""
+    dpt = entry["row"].get("dpt")
+    main = dpt_main(dpt)
+    words = " ".join(entry["own"])
+    if SENSOR_WORDS.search(words):
+        return False
+    if dpt and re.sub(r"^DPS?T-?", "", str(dpt)).replace("-", ".") in SENSOR_DPTS:
+        return False
+    if main == 9 and not re.search(r"soll|setpoint|basis", words):
+        return False  # Temperaturen usw. sind Messwerte, nur Sollwerte werden gesendet
+    return main is None or main in CONTROL_MAINS
+
+
 def status_pairs(rows: list[dict[str, Any]], range_names: dict[str, str] | None = None) -> list[dict[str, Any]]:
     """Vorschläge, welche Status-GA zu welcher Befehls-GA gehört (über Bezeichnungen und Gruppenstruktur)."""
     range_names = range_names or {}
@@ -209,7 +258,7 @@ def status_pairs(rows: list[dict[str, Any]], range_names: dict[str, str] | None 
         entries.append({"row": row, "address": address, "parts": parts, "own": own,
                         "status": _is_status(own) or _is_status(context),
                         "core": _core(own), "core_context": _core(own + context)})
-    commands = [entry for entry in entries if not entry["status"]]
+    commands = [entry for entry in entries if not entry["status"] and _is_command(entry)]
     statuses = [entry for entry in entries if entry["status"]]
     pairs, used, paired = [], set(), set()
     # Zuerst gleiche Datentypen (Position ↔ Position), danach passende Kombinationen (Auf/Ab ↔ Position)

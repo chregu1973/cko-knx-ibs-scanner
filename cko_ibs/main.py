@@ -143,10 +143,11 @@ async def connect_secure(
     keyring: Annotated[UploadFile | None, File()] = None,
 ) -> dict:
     """Connect locally using an ETS keyring or explicit Secure credentials."""
-    if keyring is None and (user_id is None or not user_password):
+    use_loaded = keyring is None and not user_password and bus_connection.data_secure_keyring is not None
+    if keyring is None and not use_loaded and (user_id is None or not user_password):
         raise HTTPException(
             status_code=400,
-            detail="Bitte .knxkeys-Datei oder Benutzer-ID und Secure-Passwort angeben.",
+            detail="Bitte in Schritt 1 den Schlüsselbund laden, eine .knxkeys-Datei wählen oder Benutzer-ID und Secure-Passwort angeben.",
         )
     try:
         if keyring is not None:
@@ -174,6 +175,7 @@ async def connect_secure(
             user_id=user_id,
             user_password=user_password,
             device_authentication_password=authentication_code,
+            use_loaded_keyring=use_loaded,
         )
     except HTTPException:
         raise
@@ -323,6 +325,16 @@ async def import_project(
     rows = summary.pop("group_addresses", [])
     bus_connection.configure_group_addresses(rows, summary.get("group_ranges"))
     return {"project": summary, "stored_on_server": False}
+
+
+class SessionResetRequest(BaseModel):
+    clear_keyring: bool = True
+
+
+@app.post("/api/session/reset")
+async def session_reset(request: SessionResetRequest) -> dict:
+    """Projektwechsel: Projekt, Gruppenadressen, Werte und SCO-Mitschnitt vergessen; Verbindung bleibt."""
+    return bus_connection.reset_session(request.clear_keyring)
 
 
 # --- Gruppenmonitor: Kacheln, Senden, Funktionstest, Aufnahmen ----------------------

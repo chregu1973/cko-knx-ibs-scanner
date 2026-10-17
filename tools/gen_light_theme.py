@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 STATIC = Path(__file__).resolve().parent.parent / "cko_ibs" / "static"
-SOURCES = ["styles.css", "connection.css", "branding.css", "sco.css", "groupmonitor.css"]
+SOURCES = ["styles.css", "connection.css", "branding.css", "sco.css", "groupmonitor.css", "building.css"]
 PREFIX = ':root[data-theme="light"]'
 COLOR = re.compile(r"#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)|\b(?:white|black|transparent)\b")
 COLOR_PROPS = ("color", "background", "background-color", "background-image", "border", "border-color",

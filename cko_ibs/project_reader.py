@@ -183,18 +183,79 @@ def _object_size(group_address: dict[str, Any], communication_objects: dict[str,
     return sizes[0] if len(sizes) == 1 else (" / ".join(sizes) if sizes else None)
 
 
+def _object_dpt(group_address: dict[str, Any], communication_objects: dict[str, Any]) -> str | None:
+    """Datentyp der verknüpften Kommunikationsobjekte, wenn die Gruppenadresse selbst keinen hat (eindeutig)."""
+    found = []
+    for object_id in group_address.get("communication_object_ids") or []:
+        for dpt in (communication_objects.get(object_id) or {}).get("dpts") or []:
+            formatted = _format_dpt(dpt)
+            if formatted and formatted not in found:
+                found.append(formatted)
+    detailed = [dpt for dpt in found if "." in dpt]
+    if len(detailed) == 1:
+        return detailed[0]
+    mains = {dpt.split(".")[0] for dpt in found}
+    return found[0] if len(mains) == 1 and found else None
+
+
 def group_address_rows(group_addresses: dict[str, Any], communication_objects: dict[str, Any]) -> list[dict[str, Any]]:
     rows = []
     for address, group_address in group_addresses.items():
+        dpt = _format_dpt(group_address.get("dpt"))
+        source = "ga" if dpt else None
+        if not dpt:
+            dpt = _object_dpt(group_address, communication_objects)
+            source = "objekt" if dpt else None
         rows.append(
             {
                 "address": str(group_address.get("address") or address),
                 "name": _name(group_address, "Unbenannte Gruppenadresse"),
-                "dpt": _format_dpt(group_address.get("dpt")),
+                "dpt": dpt,
+                "dpt_source": source,
                 "size": _object_size(group_address, communication_objects),
             }
         )
     return rows
+
+
+SPACE_TYPES = {"Building": "Gebäude", "BuildingPart": "Gebäudeteil", "Floor": "Etage", "Room": "Raum",
+               "Corridor": "Flur", "Stairway": "Treppenhaus", "DistributionBoard": "Verteiler", "Area": "Bereich"}
+
+
+def _building_tree(locations: dict[str, Any], functions: dict[str, Any], devices: dict[str, Any],
+                   communication_objects: dict[str, Any]) -> list[dict[str, Any]]:
+    """Gebäudestruktur aus der ETS: Gebäude › Etagen › Räume mit Geräten, Funktionen und Gruppenadressen."""
+
+    def node(space: dict[str, Any]) -> dict[str, Any]:
+        group_addresses: set[str] = set()
+        function_rows = []
+        for function_id in space.get("functions") or []:
+            function = functions.get(function_id) or {}
+            addresses = [str(ref.get("address")) for ref in (function.get("group_addresses") or {}).values() if ref.get("address")]
+            group_addresses.update(addresses)
+            function_rows.append({"name": _name(function, "Funktion"), "type": str(function.get("function_type") or ""),
+                                  "group_addresses": addresses})
+        device_rows = []
+        for address in space.get("devices") or []:
+            device = devices.get(address) or {}
+            device_rows.append({"address": str(address), "name": _name(device, "Gerät")})
+            for object_id in device.get("communication_object_ids") or []:
+                group_addresses.update(str(link) for link in (communication_objects.get(object_id) or {}).get("group_address_links") or [])
+        children = [node(child) for child in (space.get("spaces") or {}).values()]
+        space_type = str(space.get("type") or "")
+        return {
+            "name": _name(space, SPACE_TYPES.get(space_type, "Bereich")),
+            "type": space_type,
+            "type_label": SPACE_TYPES.get(space_type, space_type or "Bereich"),
+            "usage": str(space.get("usage_text") or ""),
+            "number": str(space.get("number") or ""),
+            "devices": device_rows,
+            "functions": function_rows,
+            "group_addresses": sorted(group_addresses),
+            "children": children,
+        }
+
+    return [node(space) for space in (locations or {}).values()]
 
 
 def read_project(path: Path, password: str | None = None) -> dict[str, Any]:
@@ -236,4 +297,6 @@ def read_project(path: Path, password: str | None = None) -> dict[str, Any]:
         ),
         "group_addresses": rows,
         "group_ranges": range_names(project.get("group_ranges") or {}),
+        "buildings": _building_tree(locations, project.get("functions") or {}, devices,
+                                    project.get("communication_objects", {}) or {}),
     }

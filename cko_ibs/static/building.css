@@ -1,0 +1,51 @@
+/* Gebäude-Seite: Haus mit Dach, Etagen und Räumen */
+.building-root{margin-top:6px}
+.bd-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:60px 20px;text-align:center;color:#8f9caf;border:1px dashed #3b4b60;border-radius:14px}
+.bd-empty span{font-size:46px}
+.bd-empty strong{color:#dce4ee;font-size:17px}
+.bd-empty small{max-width:620px;line-height:1.55}
+.bd-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;align-items:start}
+.bd-houses{display:grid;gap:28px}
+.bd-house{position:relative;padding-top:4px}
+.bd-roof{position:relative;height:86px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:12px;margin:0 6px;clip-path:polygon(50% 0,100% 100%,0 100%);background:linear-gradient(180deg,#5a1c26,#2b1219);border-bottom:3px solid #ed3948}
+.bd-roof span{font-weight:800;font-size:15px;color:#fff;text-shadow:0 1px 4px #000}
+.bd-roof small{color:#ffb3bb;font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.bd-floors{display:grid;gap:0;border:2px solid #3b4b60;border-top:0;border-radius:0 0 12px 12px;background:linear-gradient(180deg,#121c29,#0d151f);margin:0 18px}
+.bd-floor{display:grid;grid-template-columns:120px 1fr;border-top:1px solid #263346}
+.bd-floor:first-child{border-top:0}
+.bd-floor-label{padding:14px 12px;border-right:1px dashed #2c3a4e;background:#0c141f}
+.bd-floor-label strong{display:block;font-size:13px}
+.bd-floor-label small{color:#8f9caf;font-size:10px}
+.bd-rooms{display:flex;flex-wrap:wrap;gap:8px;padding:10px}
+.bd-none{color:#6f7d91;font-size:12px;align-self:center}
+.bd-room{position:relative;overflow:hidden;width:150px;min-height:92px;padding:10px 11px;border:1px solid #2c3a4e;border-radius:10px;background:#101a27;color:#f4f7fb;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:2px;transition:border-color .3s,box-shadow .4s,transform .15s}
+.bd-room:hover{transform:translateY(-2px);border-color:#3b5a80}
+.bd-room.selected{border-color:#49a6ff;box-shadow:0 0 0 1px #49a6ff}
+.bd-room .bd-icon{font-size:22px;line-height:1}
+.bd-room strong{font-size:12px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.bd-room small{color:#8f9caf;font-size:10px}
+.bd-last{font-style:normal;font-size:10px;color:#7fc2ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:12px}
+.bd-glow{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(circle at 30% 30%,#ffd46b55,transparent 70%)}
+.bd-room.active{border-color:#7a6320;box-shadow:0 0 18px #ffd46b33}
+.bd-room.active .bd-glow{opacity:.55;transition:opacity 2s}
+.bd-room.pulse::after{content:"";position:absolute;inset:0;border-radius:10px;animation:bd-pulse 1s ease-out;pointer-events:none}
+@keyframes bd-pulse{0%{box-shadow:inset 0 0 0 2px #ffd46b}100%{box-shadow:inset 0 0 0 1px transparent}}
+.bd-ground{height:10px;margin:0 4px;border-radius:0 0 8px 8px;background:linear-gradient(180deg,#1f3a2a,#0f1d15)}
+.bd-detail{position:sticky;top:90px;max-height:calc(100vh - 120px);overflow:auto;padding:16px;border:1px solid #263346;border-radius:12px;background:linear-gradient(145deg,#111a26,#0f1722)}
+.bd-detail-head{display:flex;gap:12px;align-items:center;margin-bottom:8px}
+.bd-detail-head .bd-icon{font-size:30px}
+.bd-detail-head small{color:#8f9caf;font-size:11px}
+.bd-detail-head h2{margin:2px 0;font-size:18px}
+.bd-detail-head p{margin:0;color:#8f9caf;font-size:12px}
+.bd-detail h3{margin:14px 0 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8f9caf}
+.bd-function{margin-bottom:8px}
+.bd-function strong{display:block;font-size:12px;margin-bottom:3px}
+.bd-ga{width:100%;display:grid;grid-template-columns:64px 1fr auto;gap:8px;align-items:center;padding:6px 8px;margin-bottom:3px;border:1px solid #263346;border-radius:7px;background:#0c141f;color:#dce4ee;font-size:11px;text-align:left;cursor:pointer}
+.bd-ga:hover{border-color:#49a6ff}
+.bd-ga span{color:#8f9caf;font-variant-numeric:tabular-nums}
+.bd-ga b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-ga em{font-style:normal;font-weight:800;color:#7fc2ff}
+.bd-device{font-size:12px;padding:3px 0;color:#c6d1de}
+.bd-device span{display:inline-block;width:64px;color:#8f9caf;font-variant-numeric:tabular-nums}
+.bd-hint{color:#8f9caf;font-size:12px}
+@media(max-width:1200px){.bd-layout{grid-template-columns:1fr}.bd-detail{position:static;max-height:none}}

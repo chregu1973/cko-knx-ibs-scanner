@@ -83,6 +83,36 @@ def test_json_values_and_description() -> None:
     assert group_monitor.json_value(float("nan")) == "nan"
 
 
+def test_guess_dpt_like_ets() -> None:
+    assert group_monitor.guess_dpt("Aussentemperatur °C | wer", DPTArray((0x05, 0xBE))) == "9.001"
+    assert group_monitor.guess_dpt("Helligkeit Lux | wer", DPTArray((0x00, 0x64))) == "9.004"
+    assert group_monitor.guess_dpt("Wind km/h | wer", DPTArray((0, 0))) == "9.028"
+    assert group_monitor.guess_dpt("Irgendein Wert", DPTArray((0x05, 0xBE))) == "9"
+    assert group_monitor.guess_dpt("Jalousie Position", DPTArray((0x80,))) == "5.001"
+    assert group_monitor.guess_dpt("Zähler Bezug kWh", DPTArray((0, 0, 1, 0))) == "13.013"
+    assert group_monitor.guess_dpt("Schalter", DPTBinary(1)) == "1.001"
+    assert group_monitor.decode(group_monitor.guess_dpt("x", DPTArray((0x05, 0xBE))), DPTArray((0x05, 0xBE))) == 14.7
+
+
+def test_telegram_without_dpt_is_decoded_by_guess() -> None:
+    bus_connection.configure_group_addresses([{"address": "0/1/204", "name": "Aussentemperatur °C | wer", "dpt": None}])
+    queue = bus_connection.subscribe()
+    try:
+        bus_connection._on_telegram(_incoming("0/1/204", DPTArray((0x05, 0xBE))))
+        item = queue.get_nowait()
+    finally:
+        bus_connection.unsubscribe(queue)
+    assert item["value_json"] == 14.7 and item["dpt"] == "9.001" and item["dpt_guessed"] is True and item["unit"] == "°C"
+
+
+def test_set_dpt_redecodes_last_value() -> None:
+    bus_connection.configure_group_addresses([{"address": "0/1/202", "name": "Wert", "dpt": None}])
+    bus_connection._on_telegram(_incoming("0/1/202", DPTArray((0x05, 0xBE))))
+    response = client.put("/api/monitor/dpt", json={"group_address": "0/1/202", "dpt": "9.005"})
+    state = response.json()["group"]["state"]
+    assert state["value_json"] == 14.7 and state["unit"] == "m/s" and state["dpt"] == "9.005"
+
+
 def test_values_match_with_tolerance() -> None:
     assert group_monitor.values_match(True, True)
     assert not group_monitor.values_match(True, False)
@@ -122,6 +152,48 @@ def test_status_pairs_respect_data_types() -> None:
     rows = [{"address": "1/1/1", "name": "Licht Bad", "dpt": "1.001"},
             {"address": "1/1/2", "name": "Licht Bad Status", "dpt": "9.001"}]
     assert group_monitor.status_pairs(rows) == []
+
+
+def test_sensors_are_never_suggested_as_commands() -> None:
+    rows = [
+        {"address": "12/2/15", "name": "MG 01 - UG Korridor Türe Magnetkontakt | Ein/Aus", "dpt": "1.002"},
+        {"address": "12/2/11", "name": "MG 01 - UG Korridor Türe Magnetkontakt | Status Ein/Aus", "dpt": "1.002"},
+        {"address": "1/1/33", "name": "Steckdose UG Weinkeller Gr.F1 | s-ea", "dpt": "1.001"},
+        {"address": "1/1/34", "name": "Steckdose UG Weinkeller Gr.F1 | Status s-ea", "dpt": "1.001"},
+        {"address": "3/0/1", "name": "Wohnen Temperatur", "dpt": "9.001"},
+        {"address": "3/0/2", "name": "Wohnen Temperatur Status", "dpt": "9.001"},
+        {"address": "3/1/1", "name": "Wohnen Sollwert", "dpt": "9.001"},
+        {"address": "3/1/2", "name": "Wohnen Sollwert Status", "dpt": "9.001"},
+        {"address": "6/0/3", "name": "Fenster Wohnen", "dpt": "1.019"},
+        {"address": "6/0/4", "name": "Fenster Wohnen Status", "dpt": "1.019"},
+    ]
+    pairs = {pair["command"]: pair["status"] for pair in group_monitor.status_pairs(rows)}
+    assert pairs == {"1/1/33": "1/1/34", "3/1/1": "3/1/2"}
+
+
+def test_pipe_naming_scheme_pairs_light_and_dimmer() -> None:
+    rows = [
+        {"address": "1/0/1", "name": "EG Küche Decke | Ein/Aus", "dpt": "1.001"},
+        {"address": "1/0/2", "name": "EG Küche Decke | Status Ein/Aus", "dpt": "1.001"},
+        {"address": "1/0/3", "name": "EG Küche Decke | Helligkeitswert", "dpt": "5.001"},
+        {"address": "1/0/4", "name": "EG Küche Decke | Status Helligkeitswert", "dpt": "5.001"},
+        {"address": "21/0/1", "name": "Gebäude 1_Zentral_Aus__Licht_dim", "dpt": "1.001"},
+        {"address": "21/0/3", "name": "Gebäude 1_Zentral_Aus__Licht_rm", "dpt": "1.001"},
+    ]
+    pairs = {pair["command"]: pair["status"] for pair in group_monitor.status_pairs(rows)}
+    assert pairs == {"1/0/1": "1/0/2", "1/0/3": "1/0/4", "21/0/1": "21/0/3"}
+
+
+def test_session_reset_keeps_connection(monkeypatch) -> None:
+    _fake_bus(monkeypatch)
+    bus_connection.configure_group_addresses([{"address": "1/1/1", "name": "Licht", "dpt": "1.001"}], {"1": "Licht"})
+    bus_connection.group_state["1/1/1"] = {"value_json": True}
+    bus_connection.set_send_mode(True)
+    response = client.post("/api/session/reset", json={"clear_keyring": True})
+    assert response.status_code == 200 and response.json()["connected"] is True
+    groups = client.get("/api/monitor/groups").json()
+    assert groups["groups"] == [] and groups["state"] == {} and groups["ranges"] == {}
+    assert groups["send_mode"]["enabled"] is False
 
 
 def test_range_names_are_flattened() -> None:

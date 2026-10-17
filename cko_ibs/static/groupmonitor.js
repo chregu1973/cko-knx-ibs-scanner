@@ -118,7 +118,11 @@
       gm.groups.set(address, group);
     }
     if (data.name !== undefined && data.name !== null) group.name = data.name;
-    if (data.dpt) group.dpt = data.dpt;
+    if (data.dpt && !(data.dpt_guessed && group.dpt && !group.dptGuessed)) {
+      group.dpt = data.dpt;
+      group.dptGuessed = Boolean(data.dpt_guessed);
+    }
+    if (data.dpt_source) group.dptSource = data.dpt_source;
     if (data.unit) group.unit = data.unit;
     if (!group.unit && data.info?.unit) group.unit = data.info.unit;
     group.kind = kindFor(group);
@@ -140,7 +144,7 @@
       gm.sources.set(source, entry);
       if (gm.recording) gm.recording.telegrams.push({...item, t: now - gm.recording.started});
     }
-    const group = ensureGroup(item.destination, {name: item.group_name, dpt: item.dpt, unit: item.unit});
+    const group = ensureGroup(item.destination, {name: item.group_name, dpt: item.dpt, unit: item.unit, dpt_guessed: item.dpt_guessed});
     if (item.secure) { group.secure = true; gm.secure.add(group.address); }
     if (item.undecoded) {
       group.locked = true;
@@ -187,7 +191,7 @@
       gm.secure.forEach((address) => { if (gm.groups.has(address)) gm.groups.get(address).secure = true; });
       applyDataSecure(data.data_secure);
       Object.entries(data.state || {}).forEach(([address, state]) => {
-        const group = ensureGroup(address, {dpt: state.dpt, unit: state.unit});
+        const group = ensureGroup(address, {dpt: state.dpt, unit: state.unit, dpt_guessed: state.dpt_guessed});
         group.value = state.value_json ?? group.value;
         group.hex = state.hex || group.hex;
         group.last = state.time;
@@ -252,7 +256,7 @@
   function tileHtml(group) {
     return `<button class="${tileState(group)}" type="button" data-ga="${esc(group.address)}" title="${esc(group.address)} · ${esc(group.name || "ohne Namen")}${group.dpt ? ` · DPT ${esc(group.dpt)}` : ""}">
       <span class="gm-visual">${visual(group)}</span>
-      <span class="gm-tile-text"><strong>${esc(group.name || group.address)}</strong><small>${group.secure ? "🔒 " : ""}${esc(group.address)}${group.dpt ? ` · ${esc(group.dpt)}` : " · DPT ?"}${group.status ? " · Status" : ""}</small></span>
+      <span class="gm-tile-text"><strong>${esc(group.name || group.address)}</strong><small>${group.secure ? "🔒 " : ""}${esc(group.address)}${group.dpt ? ` · ${esc(group.dpt)}${group.dptGuessed ? " vermutet" : ""}` : " · DPT ?"}${group.status ? " · Status" : ""}</small></span>
       <span class="gm-value">${esc(valueText(group))}</span>
       <span class="gm-meta" data-since="${esc(group.last || "")}">${group.count ? `${since(group.last)} · ${esc(group.source || "")} · ${group.count}×` : "noch kein Telegramm"}</span>
     </button>`;
@@ -296,7 +300,7 @@
     });
     const hint = $("gm-tile-hint");
     if (!gm.groups.size) {
-      container.innerHTML = '<div class="gm-empty"><span>▦</span><strong>Noch keine Gruppenadressen</strong><small>ETS-Projekt in der Übersicht laden – oder einfach mit dem Bus verbinden: Gruppenadressen erscheinen hier, sobald Telegramme kommen. Den Datentyp lässt sich danach pro Kachel festlegen.</small></div>';
+      container.innerHTML = '<div class="gm-empty"><span>▦</span><strong>Noch keine Gruppenadressen</strong><small>ETS-Projekt in Schritt 1 laden – oder einfach mit dem Bus verbinden: Gruppenadressen erscheinen hier, sobald Telegramme kommen. Den Datentyp lässt sich danach pro Kachel festlegen.</small></div>';
       hint.textContent = "";
       return;
     }
@@ -401,8 +405,17 @@
   }
 
   // --- Reiter -----------------------------------------------------------------------------
+  const TAB_HELP = {
+    tiles: "Jede Gruppenadresse als Kachel. Sie leuchtet kurz auf, sobald ein Telegramm kommt. Kachel anklicken, um zu schalten, einen Wert zu senden oder zu lesen.",
+    net: "Wer sendet an wen? Links die Geräte, rechts die Gruppenadressen – jedes Telegramm fliegt als Lichtpunkt über den Bus. Punkt anklicken zum Bedienen.",
+    telegrams: "Alle Telegramme als Liste – wie der Gruppenmonitor der ETS. Mit Filtern eingrenzen und als CSV speichern.",
+    test: "Funktionen mit Rückmeldung prüfen und das Ergebnis als Prüfprotokoll speichern – Schritt für Schritt erklärt.",
+    rec: "Busverkehr aufnehmen (z. B. einen sporadischen Fehler), später abspielen oder Schreib-Telegramme erneut senden.",
+  };
+
   function selectTab(tab) {
     gm.tab = tab;
+    $("gm-tab-help").textContent = TAB_HELP[tab] || "";
     document.querySelectorAll("[data-gm-tab]").forEach((button) => button.classList.toggle("active", button.dataset.gmTab === tab));
     document.querySelectorAll("[data-gm-pane]").forEach((pane) => { pane.hidden = pane.dataset.gmPane !== tab; });
     if (tab === "net") resizeNet();
@@ -474,9 +487,18 @@
           <div class="gm-inline"><label>Datentyp (DPT)<select id="gm-dpt-select"><option value="">Bitte wählen …</option>${DPT_OPTIONS.map(([dpt, label]) => `<option value="${dpt}">${dpt} · ${label}</option>`).join("")}</select></label><button type="button" class="secondary gm-set-dpt">Übernehmen</button></div>
           <div class="gm-inline"><label>Rohwert (Hex)<input id="gm-raw-input" placeholder="z. B. 01 oder 0C 1A" /></label><label class="gm-check"><input id="gm-raw-small" type="checkbox" /> kurz (1–6 Bit)</label><button type="button" class="primary gm-send-raw">Senden</button></div>`;
       default:
-        return `<div class="gm-inline"><label>Neuer Wert${group.unit ? ` (${esc(group.unit)})` : ""}<input id="gm-value-input" value="${typeof value === "number" || typeof value === "string" ? esc(value) : ""}" /></label><button type="button" class="primary gm-send-input">Senden</button></div>
-          <details class="gm-dpt-change"><summary>Datentyp ändern</summary><div class="gm-inline"><select id="gm-dpt-select"><option value="">Bitte wählen …</option>${DPT_OPTIONS.map(([dpt, label]) => `<option value="${dpt}">${dpt} · ${label}</option>`).join("")}</select><button type="button" class="secondary gm-set-dpt">Übernehmen</button></div></details>`;
+        return `<div class="gm-inline"><label>Neuer Wert${group.unit ? ` (${esc(group.unit)})` : ""}<input id="gm-value-input" value="${typeof value === "number" || typeof value === "string" ? esc(value) : ""}" /></label><button type="button" class="primary gm-send-input">Senden</button></div>`;
     }
+  }
+
+  function dptSection(group) {
+    if (group.kind === "raw") return "";
+    const label = group.dpt ? `${group.dpt}${group.dptGuessed ? " – vermutet (im Projekt ohne Datentyp)" : group.dptSource === "objekt" ? " – vom Kommunikationsobjekt" : ""}` : "unbekannt";
+    const options = DPT_OPTIONS.some(([dpt]) => dpt === group.dpt) ? DPT_OPTIONS : [...(group.dpt ? [[group.dpt, "aktueller Datentyp"]] : []), ...DPT_OPTIONS];
+    return `<details class="gm-dpt-change"${group.dptGuessed ? " open" : ""}><summary>Datentyp: <b>${esc(label)}</b></summary>
+      <div class="gm-inline"><select id="gm-dpt-select">${options.map(([dpt, text]) => `<option value="${dpt}"${dpt === group.dpt ? " selected" : ""}>${dpt} · ${text}</option>`).join("")}</select>
+      <button type="button" class="secondary gm-set-dpt">${group.dptGuessed ? "Bestätigen / übernehmen" : "Übernehmen"}</button></div>
+      <small class="gm-muted">Wird auf diesem PC gespeichert und gilt sofort – auch für den letzten Wert.</small></details>`;
   }
 
   function fillControlHistory(group) {
@@ -485,7 +507,7 @@
       : "<span>Noch keine Werte empfangen.</span>";
     $("gm-control-visual").className = `gm-control-visual ${tileState(group)}`;
     $("gm-control-visual").innerHTML = `<span class="gm-visual">${visual(group)}</span>`;
-    $("gm-control-meta").textContent = `${group.secure ? "🔒 Data Secure · " : ""}${group.dpt ? `DPT ${group.dpt}` : "Datentyp unbekannt"} · aktuell ${valueText(group)}${group.count ? ` · ${group.count} Telegramme` : ""}${group.locked ? " · Schlüsselbund in der Übersicht laden" : ""}`;
+    $("gm-control-meta").textContent = `${group.secure ? "🔒 Data Secure · " : ""}${group.dpt ? `DPT ${group.dpt}` : "Datentyp unbekannt"} · aktuell ${valueText(group)}${group.count ? ` · ${group.count} Telegramme` : ""}${group.locked ? " · Schlüsselbund in Schritt 1 «Projekt» laden" : ""}`;
   }
 
   function openControl(address) {
@@ -495,7 +517,7 @@
     dialog.dataset.ga = address;
     $("gm-control-address").textContent = `${group.address}${group.status ? " · STATUS" : ""}`;
     $("gm-control-title").textContent = group.name || group.address;
-    $("gm-control-body").innerHTML = controlBody(group);
+    $("gm-control-body").innerHTML = controlBody(group) + dptSection(group);
     $("gm-control-message").textContent = "";
     $("gm-control-message").className = "message";
     const pair = gm.pairs.find((item) => item.command === address);
@@ -543,13 +565,18 @@
     try {
       const data = await api("/api/monitor/dpt", {method: "PUT", body: JSON.stringify({group_address: group.address, dpt})});
       group.dpt = data.group.dpt;
+      group.dptGuessed = false;
       group.unit = data.group.info?.unit || null;
+      if (data.group.state) {
+        group.value = data.group.state.value_json ?? null;
+        group.unit = data.group.state.unit || group.unit;
+      }
       group.kind = kindFor(group);
       saveDptOverride(group.address, dpt);
       renderTiles();
       openControl(group.address);
       $("gm-control-message").className = "message success";
-      $("gm-control-message").textContent = `Datentyp ${dpt} festgelegt – gilt ab dem nächsten Telegramm.`;
+      $("gm-control-message").textContent = `Datentyp ${dpt} festgelegt${data.group.state ? ` – aktueller Wert: ${valueText(group)}` : ""}.`;
     } catch (error) {
       $("gm-control-message").className = "message error";
       $("gm-control-message").textContent = error.message;
@@ -818,61 +845,144 @@
     return [];
   }
 
-  function addTest(test) {
+  function addTest(test, selected = true) {
     const command = gm.groups.get(test.command);
     const entry = {
       id: `${test.command}>${test.status}`, command: test.command, command_name: test.command_name || command?.name || "",
       status: test.status || test.command, status_name: test.status_name || gm.groups.get(test.status)?.name || "",
       dpt: test.dpt || command?.dpt || null, values: test.values || defaultValues(command || {dpt: test.dpt, address: test.command}),
-      selected: true, results: [], reason: test.reason || "",
+      selected, results: [], reason: test.reason || "", auto: Boolean(test.reason),
     };
-    if (!gm.tests.some((item) => item.id === entry.id)) gm.tests.push(entry);
+    const existing = gm.tests.find((item) => item.id === entry.id);
+    if (existing) { if (selected) existing.selected = true; } else gm.tests.push(entry);
     renderTests();
   }
 
   function buildTestsFromPairs() {
+    // Vorschläge aus dem Projekt – bewusst nicht vorausgewählt
     gm.pairs.forEach((pair) => addTest({command: pair.command, command_name: pair.command_name, status: pair.status,
-      status_name: pair.status_name, dpt: pair.command_dpt, reason: pair.reason}));
+      status_name: pair.status_name, dpt: pair.command_dpt, reason: pair.reason}, false));
   }
 
   const RESULT_LABEL = {ok: "✓", mismatch: "≠", no_reply: "×", error: "!"};
+  const testCollapsed = new Set();
+
+  function testState(test) {
+    if (test.running) return "running";
+    if (!test.results.length) return "open";
+    return test.results.some((result) => result.result !== "ok") ? "problem" : "ok";
+  }
+
+  function testVisible(test) {
+    const query = $("gm-test-search").value.trim().toLocaleLowerCase("de-CH");
+    const show = $("gm-test-show").value;
+    if (show === "selected" && !test.selected) return false;
+    if (show === "problems" && testState(test) !== "problem") return false;
+    if (show === "open" && testState(test) !== "open") return false;
+    return !query || `${test.command} ${test.command_name} ${test.status} ${test.status_name}`.toLocaleLowerCase("de-CH").includes(query);
+  }
+
+  function testSection(test) {
+    const grouping = $("gm-test-grouping").value;
+    const group = gm.groups.get(test.command) || {address: test.command, dpt: test.dpt, name: test.command_name};
+    if (!group.kind) group.kind = kindFor(group);
+    return sectionKey(group, grouping);
+  }
+
+  function resultChips(test) {
+    if (test.running && !test.results.length) return '<span class="gm-result running">läuft …</span>';
+    return test.results.map((result) => `<span class="gm-result ${result.result}" title="${esc(result.message || "")}${result.received_text ? ` · Rückmeldung ${esc(result.received_text)}` : ""}">${RESULT_LABEL[result.result] || "?"} ${esc(result.value)}${result.latency_ms ? ` <small>${result.latency_ms} ms</small>` : ""}</span>`).join("")
+      || '<small class="gm-muted">ungeprüft</small>';
+  }
+
   function renderTests() {
     const body = $("gm-test-body");
+    const visible = gm.tests.map((test, index) => ({test, index})).filter(({test}) => testVisible(test));
     if (!gm.tests.length) {
-      body.innerHTML = '<tr class="monitor-empty"><td colspan="6">ETS-Projekt laden – Befehls- und Status-Adressen werden automatisch zugeordnet. Ohne Projekt: «+ Test hinzufügen».</td></tr>';
+      body.innerHTML = '<tr class="gm-test-empty"><td colspan="6">ETS-Projekt laden – bedienbare Befehls- und Status-Adressen werden automatisch zugeordnet (nichts ist vorausgewählt). Ohne Projekt: «+ Test hinzufügen» oder in einer Kachel «Als Funktionstest».</td></tr>';
+    } else if (!visible.length) {
+      body.innerHTML = '<tr class="gm-test-empty"><td colspan="6">Kein Test passt zu Suche oder Filter.</td></tr>';
     } else {
-      body.innerHTML = gm.tests.map((test, index) => `<tr data-index="${index}" class="${test.running ? "running" : ""}">
-        <td><input type="checkbox" class="gm-test-check" ${test.selected ? "checked" : ""} /></td>
-        <td><strong>${esc(test.command)}</strong><small>${esc(test.command_name)}${test.dpt ? ` · ${esc(test.dpt)}` : ""}</small></td>
-        <td><strong>${esc(test.status)}</strong><small>${esc(test.status_name)}${test.reason ? ` · ${esc(test.reason)}` : ""}</small></td>
-        <td><input class="gm-test-values" value="${esc(test.values.join("; "))}" placeholder="Werte eingeben" /></td>
-        <td class="gm-test-results">${test.results.map((result) => `<span class="gm-result ${result.result}" title="${esc(result.message || "")}${result.received_text ? ` · Rückmeldung ${esc(result.received_text)}` : ""}">${RESULT_LABEL[result.result] || "?"} ${esc(result.value)}${result.latency_ms ? ` <small>${result.latency_ms} ms</small>` : ""}</span>`).join("") || (test.running ? '<span class="gm-result running">läuft …</span>' : '<small class="gm-muted">ungeprüft</small>')}</td>
-        <td><button type="button" class="secondary compact gm-test-one">▶</button><button type="button" class="gm-test-remove" title="Entfernen">×</button></td>
-      </tr>`).join("");
+      const sections = new Map();
+      visible.forEach((entry) => {
+        const {key, label} = testSection(entry.test);
+        if (!sections.has(key)) sections.set(key, {label, items: []});
+        sections.get(key).items.push(entry);
+      });
+      body.innerHTML = [...sections.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, section]) => {
+        const selected = section.items.filter(({test}) => test.selected).length;
+        const done = section.items.filter(({test}) => test.results.length);
+        const problems = done.filter(({test}) => testState(test) === "problem").length;
+        const collapsed = testCollapsed.has(key);
+        return `<tr class="gm-test-group" data-section="${esc(key)}"><td><input type="checkbox" class="gm-test-group-check" ${selected === section.items.length ? "checked" : ""} title="Ganze Gruppe auswählen" /></td>
+          <td colspan="3"><button type="button" class="gm-test-group-toggle">${collapsed ? "▸" : "▾"} ${esc(section.label)}</button> <small>${section.items.length} Tests · ${selected} ausgewählt${done.length ? ` · ${done.length - problems} ✓ · ${problems} Probleme` : ""}</small></td>
+          <td colspan="2"><button type="button" class="secondary compact gm-test-group-run">▶ Gruppe testen</button></td></tr>`
+          + (collapsed ? "" : section.items.map(({test, index}) => `<tr data-index="${index}" class="gm-test-row ${testState(test)}">
+            <td><input type="checkbox" class="gm-test-check" ${test.selected ? "checked" : ""} /></td>
+            <td><strong>${esc(test.command)}</strong><small>${esc(test.command_name)}${test.dpt ? ` · ${esc(test.dpt)}` : ""}</small></td>
+            <td><strong>${esc(test.status)}</strong><small>${esc(test.status_name)}</small>${test.reason ? `<small class="gm-reason">Vorschlag: ${esc(test.reason)}</small>` : ""}</td>
+            <td><input class="gm-test-values" value="${esc(test.values.join("; "))}" placeholder="Werte, z. B. ein; aus" /></td>
+            <td class="gm-test-results">${resultChips(test)}</td>
+            <td class="gm-test-actions"><button type="button" class="secondary compact gm-test-one" title="Nur diesen Test ausführen">▶ Test</button><button type="button" class="gm-test-remove" title="Test entfernen">Entfernen</button></td>
+          </tr>`).join(""));
+      }).join("");
     }
     const results = gm.tests.flatMap((test) => test.results);
     const count = (kind) => results.filter((result) => result.result === kind).length;
-    $("gm-test-summary").innerHTML = results.length
-      ? `<span class="ok">✓ ${count("ok")} in Ordnung</span><span class="mismatch">≠ ${count("mismatch")} abweichend</span><span class="no_reply">× ${count("no_reply")} ohne Rückmeldung</span>${count("error") ? `<span class="error">! ${count("error")} Fehler</span>` : ""}`
-      : `${gm.tests.length} Tests vorbereitet${gm.pairs.length ? ` · ${gm.pairs.length} automatisch aus dem Projekt zugeordnet` : ""}`;
+    const selectedCount = gm.tests.filter((test) => test.selected).length;
+    $("gm-test-summary").innerHTML = `<span>${gm.tests.length} Tests · ${selectedCount} ausgewählt${gm.pairs.length ? ` · ${gm.pairs.length} Vorschläge aus dem Projekt` : ""}</span>`
+      + (results.length ? `<span class="ok">✓ ${count("ok")} in Ordnung</span><span class="mismatch">≠ ${count("mismatch")} abweichend</span><span class="no_reply">× ${count("no_reply")} ohne Rückmeldung</span>${count("error") ? `<span class="error">! ${count("error")} Fehler</span>` : ""}` : "");
     $("gm-test-protocol").disabled = !results.length;
+    $("gm-test-run").textContent = selectedCount ? `▶ ${selectedCount} ausgewählte testen` : "▶ Ausgewählte testen";
+    $("gm-test-run").disabled = gm.testRunning || !selectedCount;
   }
 
+  ["gm-test-search"].forEach((id) => $(id).addEventListener("input", renderTests));
+  ["gm-test-grouping", "gm-test-show"].forEach((id) => $(id).addEventListener("change", renderTests));
   $("gm-test-body").addEventListener("change", (event) => {
+    const groupRow = event.target.closest("tr.gm-test-group");
+    if (groupRow && event.target.classList.contains("gm-test-group-check")) {
+      gm.tests.filter((test) => testVisible(test) && testSection(test).key === groupRow.dataset.section)
+        .forEach((test) => { test.selected = event.target.checked; });
+      renderTests();
+      return;
+    }
     const row = event.target.closest("tr[data-index]");
     if (!row) return;
     const test = gm.tests[Number(row.dataset.index)];
-    if (event.target.classList.contains("gm-test-check")) test.selected = event.target.checked;
+    if (event.target.classList.contains("gm-test-check")) { test.selected = event.target.checked; renderTests(); }
     if (event.target.classList.contains("gm-test-values")) test.values = event.target.value.split(";").map((value) => value.trim()).filter(Boolean);
   });
   $("gm-test-body").addEventListener("click", async (event) => {
+    const groupRow = event.target.closest("tr.gm-test-group");
+    if (groupRow) {
+      const key = groupRow.dataset.section;
+      if (event.target.closest(".gm-test-group-toggle")) {
+        if (testCollapsed.has(key)) testCollapsed.delete(key); else testCollapsed.add(key);
+        renderTests();
+      }
+      if (event.target.closest(".gm-test-group-run")) await runTests(gm.tests.filter((test) => testVisible(test) && testSection(test).key === key));
+      return;
+    }
     const row = event.target.closest("tr[data-index]");
     if (!row) return;
     const index = Number(row.dataset.index);
     if (event.target.closest(".gm-test-remove")) { gm.tests.splice(index, 1); renderTests(); }
     if (event.target.closest(".gm-test-one")) await runTests([gm.tests[index]]);
   });
-  $("gm-test-all").addEventListener("change", (event) => { gm.tests.forEach((test) => { test.selected = event.target.checked; }); renderTests(); });
+  $("gm-test-select-visible").addEventListener("click", () => { gm.tests.filter(testVisible).forEach((test) => { test.selected = true; }); renderTests(); });
+  $("gm-test-select-none").addEventListener("click", () => { gm.tests.forEach((test) => { test.selected = false; }); renderTests(); });
+  $("gm-test-remove-selected").addEventListener("click", () => {
+    const count = gm.tests.filter((test) => test.selected).length;
+    if (!count || !window.confirm(`${count} ausgewählte Tests entfernen?`)) return;
+    gm.tests = gm.tests.filter((test) => !test.selected);
+    renderTests();
+  });
+  $("gm-test-remove-all").addEventListener("click", () => {
+    if (!gm.tests.length || !window.confirm(`Alle ${gm.tests.length} Tests entfernen? Vorschläge aus dem Projekt lassen sich durch erneutes Laden des Projekts wiederherstellen.`)) return;
+    gm.tests = [];
+    renderTests();
+  });
   $("gm-test-run").addEventListener("click", () => runTests(gm.tests.filter((test) => test.selected)));
   $("gm-test-stop").addEventListener("click", () => { gm.testStop = true; });
 
@@ -903,7 +1013,7 @@
       test.running = false; renderTests();
     }
     gm.testRunning = false;
-    $("gm-test-run").disabled = false; $("gm-test-stop").disabled = true;
+    $("gm-test-stop").disabled = true;
     renderTests();
   }
 
@@ -1131,12 +1241,12 @@
     button.textContent = "⚡ Auf den Bus senden";
   });
 
-  // --- KNX Data Secure (Übersicht › Verbindung) -----------------------------------------------
+  // --- KNX Data Secure (Schritt 1 › Projekt) -----------------------------------------------
   function showSecureHint() {
     if (gm.secureHintShown || gm.dataSecure?.active) return;
     gm.secureHintShown = true;
     const hint = $("gm-tile-hint");
-    hint.insertAdjacentHTML("afterend", '<div class="gm-secure-hint">🔒 Verschlüsselte Telegramme (KNX Data Secure) empfangen, aber kein passender Schlüssel geladen. In der <b>Übersicht</b> unter «KNX Data Secure» die .knxkeys-Datei aus der ETS laden – dann erscheinen die Werte lesbar.</div>');
+    hint.insertAdjacentHTML("afterend", '<div class="gm-secure-hint">🔒 Verschlüsselte Telegramme (KNX Data Secure) empfangen, aber kein passender Schlüssel geladen. In <b>Schritt 1 «Projekt»</b> unter «KNX Secure» die .knxkeys-Datei aus der ETS laden – dann erscheinen die Werte lesbar.</div>');
   }
 
   function applyDataSecure(status) {
@@ -1147,6 +1257,10 @@
     badge.className = `ds-badge${status.loaded ? (status.active || !busConnected ? " loaded" : " warn") : ""}`;
     badge.textContent = status.loaded ? `${status.group_address_count} Adressen${status.active ? " · aktiv" : busConnected ? " · nicht aktiv" : " · bereit"}` : "nicht geladen";
     $("ds-clear").hidden = !status.loaded;
+    const note = $("secure-keyring-note");
+    if (note) note.innerHTML = status.loaded
+      ? `✓ Schlüsselbund aus Schritt 1 (<b>${esc(status.filename || ".knxkeys")}</b>) wird für den Secure-Tunnel verwendet – hier nichts weiter nötig.`
+      : 'Tipp: Den Schlüsselbund einmal in <button type="button" class="link-button" data-go-view="project">Schritt 1 «Projekt»</button> laden – dann muss hier nichts mehr ausgewählt werden.';
     if (!status.loaded) { box.hidden = true; return; }
     box.hidden = false;
     const current = status.current_interface;
@@ -1205,15 +1319,134 @@
     if (!button) return;
     $("individual-address").value = button.dataset.dsIa;
     $("ds-message").className = "message success";
-    $("ds-message").textContent = `Tunneladresse ${button.dataset.dsIa} übernommen – mit «Verbinden» (TCP) neu verbinden.`;
+    $("ds-message").textContent = `Tunneladresse ${button.dataset.dsIa} übernommen – in Schritt 2 mit «Verbinden» (TCP) neu verbinden.`;
   });
+
+  // --- Schnellbedienung (in jeder Ansicht) ------------------------------------------------------
+  const RECENT_STORE = "cko-ibs-gm-recent";
+  const GA_PATTERN = /^\d{1,2}\/\d{1,2}\/\d{1,3}$|^\d{1,2}\/\d{1,4}$/;
+  let quickWait = null;
+
+  function quickGroup() {
+    const text = $("qb-ga").value.trim();
+    if (!text) return null;
+    if (GA_PATTERN.test(text)) return ensureGroupLight(text);
+    const query = text.toLocaleLowerCase("de-CH");
+    const match = [...gm.groups.values()].find((group) => (group.name || "").toLocaleLowerCase("de-CH").includes(query));
+    if (match) $("qb-ga").value = match.address;
+    return match || null;
+  }
+
+  function ensureGroupLight(address) {
+    return gm.groups.get(address) || {address, name: null, dpt: null, kind: "raw", value: null};
+  }
+
+  function updateQuickInfo() {
+    const group = quickGroup();
+    const info = $("qb-info");
+    if (!group) { info.textContent = $("qb-ga").value.trim() ? "Unbekannt – als Gruppenadresse eingeben, z. B. 1/1/5" : "Gruppenadresse eingeben"; $("qb-toggle").hidden = true; return; }
+    if (!$("qb-dpt").dataset.manual) $("qb-dpt").value = group.dpt || "";
+    const kind = group.dpt ? kindFor({...group, dpt: $("qb-dpt").value || group.dpt}) : "raw";
+    info.textContent = `${group.name || "ohne Namen"}${group.dpt ? ` · ${group.dpt}${group.dptGuessed ? " vermutet" : ""}` : ""}${group.count ? ` · aktuell ${valueText(group)}` : ""}`;
+    $("qb-toggle").hidden = dptMain($("qb-dpt").value || group.dpt) !== 1;
+    $("qb-value").placeholder = {light: "ein / aus", switch: "ein / aus", updown: "auf / ab", openclose: "offen / zu", level: "0–100 %", blind: "0–100 %", temp: "z. B. 21.5", hvac: "comfort, standby, night"}[kind] || "Wert, z. B. ein, 50, 21.5";
+  }
+
+  function rememberQuick(address) {
+    let recent = [];
+    try { recent = JSON.parse(localStorage.getItem(RECENT_STORE) || "[]"); } catch { /* leer */ }
+    recent = [address, ...recent.filter((item) => item !== address)].slice(0, 8);
+    try { localStorage.setItem(RECENT_STORE, JSON.stringify(recent)); } catch { /* optional */ }
+    renderQuickRecent(recent);
+  }
+
+  function renderQuickRecent(recent) {
+    if (!recent) { try { recent = JSON.parse(localStorage.getItem(RECENT_STORE) || "[]"); } catch { recent = []; } }
+    $("qb-recent").innerHTML = recent.map((address) => `<button type="button" data-qb-ga="${esc(address)}" title="${esc(gm.groups.get(address)?.name || "")}">${esc(address)}</button>`).join("");
+  }
+
+  function quickResult(text, type = "") {
+    const box = $("qb-result");
+    box.className = `qb-result ${type}`;
+    box.textContent = text;
+  }
+
+  function waitForReply(address, startedText) {
+    if (quickWait) clearTimeout(quickWait.timer);
+    const started = performance.now();
+    // Rückmeldung kommt oft auf der zugehörigen Status-Adresse (z. B. 1/4/1 → 1/5/1)
+    const status = gm.pairs.find((pair) => pair.command === address)?.status;
+    quickWait = {address, status, started, timer: setTimeout(() => {
+      if (quickWait?.address === address) { quickResult(`${startedText} – keine Rückmeldung innert 3 s`, "warn"); quickWait = null; }
+    }, 3000)};
+  }
+
+  window.addEventListener("knx-telegram", (event) => {
+    const item = event.detail;
+    if (!quickWait || item.direction === "Outgoing" || ![quickWait.address, quickWait.status].includes(item.destination)) return;
+    if (!["GroupValueResponse", "GroupValueWrite"].includes(item.service)) return;
+    const group = gm.groups.get(item.destination);
+    clearTimeout(quickWait.timer);
+    const where = item.destination === quickWait.address ? "" : ` auf Status ${item.destination}`;
+    quickResult(`${item.service === "GroupValueResponse" ? "Antwort" : "Rückmeldung"}${where} von ${item.source}: ${group ? valueText(group) : item.value} · ${Math.round(performance.now() - quickWait.started)} ms`, "ok");
+    updateQuickInfo();
+    quickWait = null;
+  });
+
+  async function quickAction(mode) {
+    const group = quickGroup();
+    const address = $("qb-ga").value.trim();
+    if (!GA_PATTERN.test(address)) { quickResult("Bitte eine Gruppenadresse wie 1/1/5 eingeben oder einen Namen aus dem Projekt wählen.", "error"); $("qb-ga").focus(); return; }
+    const dpt = $("qb-dpt").value.trim() || group?.dpt || null;
+    try {
+      if (!(await ensureSendMode())) return;
+      rememberQuick(address);
+      if (mode === "read") {
+        await send(address, {service: "read", label: "Schnellbedienung"});
+        quickResult(`Lese-Anfrage an ${address} gesendet …`);
+        waitForReply(address, "Lese-Anfrage gesendet");
+        return;
+      }
+      let value = $("qb-value").value.trim();
+      if (mode === "toggle") value = group?.value === true ? "aus" : "ein";
+      if (!value) { quickResult("Bitte einen Wert eingeben, z. B. «ein» oder «50».", "error"); $("qb-value").focus(); return; }
+      const payload = dpt ? {dpt, value} : {raw_hex: value, raw_small: /^[0-3]?[0-9a-f]$/i.test(value)};
+      const sent = await send(address, {...payload, label: "Schnellbedienung"});
+      quickResult(`Gesendet: ${sent.value ?? sent.hex}${sent.secure_warning ? " – ⚠ Quelladresse ist kein Data-Secure-Sender" : ""} – warte auf Rückmeldung …`, sent.secure_warning ? "warn" : "");
+      waitForReply(address, `Gesendet: ${sent.value ?? sent.hex}`);
+    } catch (error) {
+      quickResult(error.message, "error");
+    }
+  }
+
+  $("qb-ga").addEventListener("input", () => { delete $("qb-dpt").dataset.manual; updateQuickInfo(); });
+  $("qb-ga").addEventListener("change", updateQuickInfo);
+  $("qb-dpt").addEventListener("input", () => { $("qb-dpt").dataset.manual = "1"; updateQuickInfo(); });
+  $("qb-read").addEventListener("click", () => quickAction("read"));
+  $("qb-send").addEventListener("click", () => quickAction("send"));
+  $("qb-toggle").addEventListener("click", () => quickAction("toggle"));
+  $("qb-value").addEventListener("keydown", (event) => { if (event.key === "Enter") quickAction("send"); });
+  $("qb-ga").addEventListener("keydown", (event) => { if (event.key === "Enter") { updateQuickInfo(); $("qb-value").focus(); } });
+  $("qb-recent").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-qb-ga]");
+    if (!button) return;
+    $("qb-ga").value = button.dataset.qbGa;
+    delete $("qb-dpt").dataset.manual;
+    updateQuickInfo();
+    $("qb-value").focus();
+  });
+  renderQuickRecent();
 
   // --- Auswahllisten --------------------------------------------------------------------------
   function fillDatalists() {
-    $("gm-ga-list").innerHTML = [...gm.groups.values()].slice(0, 3000).map((group) => `<option value="${esc(group.address)}">${esc(group.name || "")}</option>`).join("");
+    $("gm-ga-list").innerHTML = [...gm.groups.values()].sort((a, b) => gaSortKey(a.address).localeCompare(gaSortKey(b.address))).slice(0, 4000)
+      .map((group) => `<option value="${esc(group.address)}" label="${esc(`${group.name || ""}${group.dpt ? ` · ${group.dpt}` : ""}`)}">${esc(group.name || "")}</option>`).join("");
     $("gm-dpt-list").innerHTML = DPT_OPTIONS.map(([dpt, label]) => `<option value="${dpt}">${label}</option>`).join("");
   }
 
+  // Schnittstelle für die Gebäude-Seite (building.js)
+  window.gmApi = {groups: gm.groups, valueText, openControl, kindFor};
+  $("gm-tab-help").textContent = TAB_HELP.tiles;
   fillDatalists();
   loadGroups();
   refreshSendMode();
