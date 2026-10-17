@@ -87,11 +87,20 @@ def payload_hex(payload_value: Any) -> str:
     return ""
 
 
+# xknx liefert einzelne Einheiten auf Englisch
+UNIT_DE = {"counter pulses": "Impulse", "pulses": "Impulse"}
+
+
+def unit_of(transcoder: Any) -> str | None:
+    unit = getattr(transcoder, "unit", None) if transcoder is not None else None
+    return UNIT_DE.get(unit, unit)
+
+
 def describe(dpt: Any) -> dict[str, Any]:
     transcoder = transcoder_for(dpt)
     return {
         "main": dpt_main(dpt),
-        "unit": getattr(transcoder, "unit", None) if transcoder else None,
+        "unit": unit_of(transcoder),
         "value_type": getattr(transcoder, "value_type", None) if transcoder else None,
     }
 
@@ -167,7 +176,8 @@ _GUESS_BY_NAME = {
         (r"\bw\b|leistung|watt", "14.056"), (r"\bv\b|spannung", "14.027"), (r"\ba\b|strom", "14.019")],
     14: [(r".", "16.001")],
 }
-_GUESS_BY_LENGTH = {1: "5.010", 2: "9", 4: "14"}
+# 1 Byte ohne Hinweis im Namen: meist Helligkeit/Position in % (Zählerwerte 0–255 sind selten)
+_GUESS_BY_LENGTH = {1: "5.001", 2: "9", 4: "14"}
 
 
 def guess_dpt(name: Any, payload_value: Any) -> str | None:

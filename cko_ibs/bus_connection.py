@@ -923,7 +923,7 @@ class BusConnection:
             "value": decoded,
             "value_json": group_monitor.json_value(telegram.decoded_data.value) if telegram.decoded_data
             else group_monitor.decode(dpt, getattr(payload, "value", None)),
-            "unit": getattr(transcoder, "unit", None) if transcoder is not None else group_monitor.describe(dpt)["unit"],
+            "unit": group_monitor.unit_of(transcoder) if transcoder is not None else group_monitor.describe(dpt)["unit"],
             "hex": group_monitor.payload_hex(getattr(payload, "value", None)),
             "small": isinstance(getattr(payload, "value", None), DPTBinary),
             "raw": str(payload) if payload is not None else "",

@@ -3,6 +3,11 @@
 Lokaler Windows-Assistent für KNX-Inbetriebnahme, ETS-Projektvergleich,
 KNX/IP- und KNX-USB-Diagnose.
 
+## Version 1.1.1
+
+- Datentyp-Vermutung: 1-Byte-Adressen ohne Hinweis im Namen werden als Prozent (5.001) vermutet statt als Zähler (5.010) – z. B. «40 %» statt «102 counter pulses».
+- Englische Einheiten aus xknx auf Deutsch («Impulse» statt «counter pulses»/«pulses»).
+
 ## Version 1.1.0
 
 Neuer Aufbau in sechs Schritten: **1 Projekt** (ETS-Projekt, Projektpasswort und Secure-Schlüsselbund – alles optional) · **2 Verbindung** (einrichten und Linie scannen) · **3 Gruppenmonitor** · **4 Topologie & Geräte** · **5 SCO-Objekt** · **6 Gebäude**. «↺ Zurücksetzen» leert alles für ein neues Projekt, die KNX-Verbindung bleibt bestehen.

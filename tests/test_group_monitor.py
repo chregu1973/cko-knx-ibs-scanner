@@ -94,6 +94,15 @@ def test_guess_dpt_like_ets() -> None:
     assert group_monitor.decode(group_monitor.guess_dpt("x", DPTArray((0x05, 0xBE))), DPTArray((0x05, 0xBE))) == 14.7
 
 
+def test_one_byte_without_hint_is_percent_and_units_are_german() -> None:
+    # Unbenannte 1-Byte-Adresse (z. B. Status Helligkeit 40 %) nicht als «102 counter pulses» anzeigen
+    assert group_monitor.guess_dpt(None, DPTArray((0x66,))) == "5.001"
+    assert group_monitor.decode("5.001", DPTArray((0x66,))) == 40
+    assert group_monitor.describe("5.010")["unit"] == "Impulse"
+    assert group_monitor.describe("7.001")["unit"] == "Impulse"
+    assert group_monitor.describe("9.001")["unit"] == "°C"
+
+
 def test_telegram_without_dpt_is_decoded_by_guess() -> None:
     bus_connection.configure_group_addresses([{"address": "0/1/204", "name": "Aussentemperatur °C | wer", "dpt": None}])
     queue = bus_connection.subscribe()
